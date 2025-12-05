@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cl-server-shared"
+version = "0.1.0"
+description = "Shared utilities for CL Server services - database, file storage, MQTT, and compute modules"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "CL Server Team"}
+]
+maintainers = [
+    {name = "CL Server Team"}
+]
+keywords = [
+    "server",
+    "shared",
+    "utilities",
+    "database",
+    "file-storage",
+    "mqtt",
+    "compute",
+    "media-processing",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Database",
+    "Topic :: System :: Distributed Computing",
+]
+dependencies = [
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+mqtt = [
+    "paho-mqtt>=1.6.0",
+]
+fastapi = [
+    "fastapi>=0.100.0",
+    "python-multipart>=0.0.6",
+]
+compute = [
+    "Pillow>=10.0.0",
+]
+all = [
+    "cl-server-shared[mqtt,fastapi,compute]",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/cl-server/cl-server-shared"
+Documentation = "https://github.com/cl-server/cl-server-shared#readme"
+Repository = "https://github.com/cl-server/cl-server-shared"
+Issues = "https://github.com/cl-server/cl-server-shared/issues"
+Changelog = "https://github.com/cl-server/cl-server-shared/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cl_server_shared = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.coverage.run]
+source = ["src/cl_server_shared"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
