@@ -9,6 +9,7 @@ The adapters handle:
 - JSON serialization/deserialization for params and task_output
 - Adding database-specific fields (timestamps, retry logic, user tracking)
 - Atomic job claiming with optimistic locking
+- MQTT broadcasting of job progress updates
 """
 
 import json
@@ -27,6 +28,15 @@ from cl_media_tools.common.schemas import Job as LibraryJob
 # Application models and services
 from .models.job import Job as DatabaseJob
 from .file_storage import FileStorageService
+
+# MQTT broadcasting
+from .config import (
+    BROADCAST_TYPE,
+    MQTT_BROKER,
+    MQTT_PORT,
+    MQTT_TOPIC,
+)
+from .mqtt import get_broadcaster
 
 
 class SQLAlchemyJobRepository:
@@ -59,12 +69,20 @@ class SQLAlchemyJobRepository:
     """
 
     def __init__(self, session_factory):
-        """Initialize repository with session factory.
+        """Initialize repository with session factory and MQTT broadcaster.
 
         Args:
             session_factory: SQLAlchemy session factory (sessionmaker)
         """
         self.session_factory = session_factory
+
+        # Setup broadcaster for job progress updates
+        self.broadcaster = get_broadcaster(
+            broadcast_type=BROADCAST_TYPE,
+            broker=MQTT_BROKER,
+            port=MQTT_PORT,
+            topic=MQTT_TOPIC,
+        )
 
     def _db_to_library_job(self, db_job: DatabaseJob) -> LibraryJob:
         """Convert database Job to library Job schema.
@@ -95,14 +113,14 @@ class SQLAlchemyJobRepository:
             status=db_job.status,
             progress=db_job.progress,
             task_output=task_output,
-            error_message=db_job.error_message
+            error_message=db_job.error_message,
         )
 
     def add_job(
         self,
         job: LibraryJob,
         created_by: Optional[str] = None,
-        priority: Optional[int] = None
+        priority: Optional[int] = None,
     ) -> str:
         """Save job to database.
 
@@ -133,7 +151,7 @@ class SQLAlchemyJobRepository:
                 error_message=job.error_message,
                 retry_count=0,
                 max_retries=3,
-                created_by=created_by
+                created_by=created_by,
             )
 
             session.add(db_job)
@@ -159,7 +177,7 @@ class SQLAlchemyJobRepository:
             return None
 
     def update_job(self, job_id: str, **kwargs) -> bool:
-        """Update job fields.
+        """Update job fields and broadcast progress to MQTT.
 
         Handles both library fields and database-specific fields:
         - Library fields: status, progress, task_output, error_message
@@ -169,6 +187,7 @@ class SQLAlchemyJobRepository:
         - task_output dict is serialized to JSON string
         - When status changes to "processing", sets started_at if not set
         - When status changes to "completed" or "error", sets completed_at
+        - Broadcasts progress updates via MQTT when progress changes
 
         Args:
             job_id: Unique job identifier
@@ -181,6 +200,10 @@ class SQLAlchemyJobRepository:
             # Build update values
             update_values = {}
 
+            # Track status and progress for broadcasting
+            status = kwargs.get("status")
+            progress = kwargs.get("progress")
+
             # Handle library fields
             if "status" in kwargs:
                 update_values["status"] = kwargs["status"]
@@ -188,7 +211,9 @@ class SQLAlchemyJobRepository:
                 # Auto-set timestamps based on status
                 if kwargs["status"] == "processing":
                     # Check if started_at is not already set
-                    stmt = select(DatabaseJob.started_at).where(DatabaseJob.job_id == job_id)
+                    stmt = select(DatabaseJob.started_at).where(
+                        DatabaseJob.job_id == job_id
+                    )
                     started_at = session.execute(stmt).scalar_one_or_none()
                     if started_at is None:
                         update_values["started_at"] = int(time.time() * 1000)
@@ -202,7 +227,9 @@ class SQLAlchemyJobRepository:
             if "task_output" in kwargs:
                 # Serialize dict to JSON string
                 task_output = kwargs["task_output"]
-                update_values["task_output"] = json.dumps(task_output) if task_output else None
+                update_values["task_output"] = (
+                    json.dumps(task_output) if task_output else None
+                )
 
             if "error_message" in kwargs:
                 update_values["error_message"] = kwargs["error_message"]
@@ -229,7 +256,24 @@ class SQLAlchemyJobRepository:
             result = session.execute(stmt)
             session.commit()
 
+            # Broadcast progress update via MQTT if progress was updated
+            if result.rowcount > 0 and progress is not None:
+                self._broadcast_progress(job_id, status or "processing", progress)
+
             return result.rowcount > 0
+
+    def _broadcast_progress(self, job_id: str, status: str, progress: float):
+        """Broadcast job progress update via MQTT.
+
+        Args:
+            job_id: Unique job identifier
+            status: Current job status
+            progress: Progress percentage (0-100)
+        """
+        if not self.broadcaster.connected:
+            return
+
+        self.broadcaster.publish_event(status, job_id, {"progress": progress})
 
     def fetch_next_job(self, task_types: List[str]) -> Optional[LibraryJob]:
         """Atomically find and claim the next queued job.
@@ -259,7 +303,7 @@ class SQLAlchemyJobRepository:
                 select(DatabaseJob)
                 .where(
                     DatabaseJob.status == "queued",
-                    DatabaseJob.task_type.in_(task_types)
+                    DatabaseJob.task_type.in_(task_types),
                 )
                 .order_by(DatabaseJob.created_at)
                 .limit(1)
@@ -277,12 +321,9 @@ class SQLAlchemyJobRepository:
                 update(DatabaseJob)
                 .where(
                     DatabaseJob.job_id == db_job.job_id,
-                    DatabaseJob.status == "queued"  # Optimistic lock
+                    DatabaseJob.status == "queued",  # Optimistic lock
                 )
-                .values(
-                    status="processing",
-                    started_at=current_time
-                )
+                .values(status="processing", started_at=current_time)
             )
 
             result = session.execute(stmt)
