@@ -73,6 +73,18 @@ class MQTTBroadcaster:
             logger.error(f"Error publishing retained message: {e}")
             return False
 
+    def clear_retained(self, topic: str, qos: int = 1) -> bool:
+        """Clear a retained MQTT message by publishing empty payload.
+
+        Args:
+            topic: Topic to clear
+            qos: Quality of Service level (default: 1)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.publish_retained(topic, "", qos=qos)
+
     def _on_connect(self, client, userdata, flags, rc):
         self.connected = (rc == 0)
 
@@ -88,6 +100,8 @@ class NoOpBroadcaster:
     def set_will(self, topic: str, payload: str, qos: int = 1, retain: bool = True) -> bool:
         return True
     def publish_retained(self, topic: str, payload: str, qos: int = 1) -> bool:
+        return True
+    def clear_retained(self, topic: str, qos: int = 1) -> bool:
         return True
 
 

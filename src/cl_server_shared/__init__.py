@@ -51,8 +51,7 @@ from .config import (
 from . import config
 
 # Compute
-from .compute import ComputeModule, run_compute_job
-from .schemas import ComputeJobParams, ImageResizeParams, ImageConversionParams
+from .compute import run_compute_job
 
 __all__ = [
     # Database
@@ -93,9 +92,5 @@ __all__ = [
     "MQTT_TOPIC",
     "COMPUTE_STORAGE_DIR",
     # Compute
-    "ComputeModule",
     "run_compute_job",
-    "ComputeJobParams",
-    "ImageResizeParams",
-    "ImageConversionParams",
 ]

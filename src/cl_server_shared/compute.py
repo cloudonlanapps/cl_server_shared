@@ -6,11 +6,21 @@ import json
 import logging
 import sys
 import time
-from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy.orm import sessionmaker
+
+# Import ComputeModule from cl_media_tools (optional for testing)
+try:
+    from cl_media_tools.common.compute_module import ComputeModule
+except ImportError:
+    # Define a placeholder if cl_media_tools is not installed
+    from typing import Protocol
+    class ComputeModule(Protocol):
+        """Placeholder for ComputeModule when cl_media_tools is not available."""
+        @property
+        def supported_task_types(self) -> List[str]: ...
+        async def process(self, job_id: str, task_type: str, params: Dict[str, Any], progress_callback: Optional[Callable[[int], None]] = None) -> Dict[str, Any]: ...
 
 from .config import (
     WORKER_DATABASE_URL,
@@ -28,51 +38,6 @@ from .mqtt import get_broadcaster, shutdown_broadcaster
 # Configure logging
 logging.basicConfig(level=LOG_LEVEL)
 logger = logging.getLogger("compute-runner")
-
-
-from .schemas import ComputeJobParams, ImageResizeParams, ImageConversionParams
-
-class ComputeModule(ABC):
-    """Base class for all compute modules."""
-
-    @property
-    @abstractmethod
-    def supported_task_types(self) -> List[str]:
-        """
-        Return list of task types this module supports.
-
-        Returns:
-            List of task type strings (e.g., ["image_resize", "image_conversion"])
-        """
-        pass
-
-    @abstractmethod
-    async def process(
-        self,
-        job_id: str,
-        task_type: str,
-        params: ComputeJobParams,
-        progress_callback: Optional[Callable[[int], None]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Process a compute job.
-
-        Args:
-            job_id: Unique job identifier
-            task_type: The type of task to perform (e.g. "image_resize")
-            params: Validated job parameters (Pydantic model)
-            progress_callback: Optional callback to report progress (0-100)
-
-        Returns:
-            Dictionary with:
-            {
-                "status": "ok" or "error",
-                "output_files": [{file_id: str, metadata: dict}, ...],
-                "task_output": {...},  # Task-specific results
-                "error": Optional error message
-            }
-        """
-        pass
 
 
 def _execute_async_module(module, job_id, task_type, params, progress_callback):
@@ -141,22 +106,13 @@ def run_compute_job(module: ComputeModule):
         # 3. Parse Parameters
         task_type = job.task_type
         logger.info(f"Loading module for {task_type}")
-        
+
         # Verify module supports this task
         if task_type not in module.supported_task_types:
             logger.warning(f"Module supports {module.supported_task_types}, but job is {task_type}")
 
         try:
-            params_dict = json.loads(job.params)
-            
-            if task_type == "image_resize":
-                params = ImageResizeParams(**params_dict)
-            elif task_type == "image_conversion":
-                params = ImageConversionParams(**params_dict)
-            else:
-                # Fallback to base params if unknown task type
-                params = ComputeJobParams(**params_dict)
-                
+            params = json.loads(job.params)
         except Exception as e:
             logger.error(f"Failed to parse parameters: {e}")
             raise ValueError(f"Invalid parameters: {e}")

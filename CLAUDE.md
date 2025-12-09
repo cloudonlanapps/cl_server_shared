@@ -63,7 +63,6 @@ The library is designed for a **multi-service architecture**:
 3. **Worker Service** - Distributed compute processing
    - Uses `Config.WORKER_DATABASE_URL` (same as store: `media_store.db`)
    - Claims and processes jobs from shared database
-   - Implements `ComputeModule` base class for tasks
 
 ### Database Sharing Model
 
@@ -89,6 +88,7 @@ Global singleton pattern via `get_broadcaster()`:
 - `MQTTBroadcaster` for production (paho-mqtt)
 - `NoOpBroadcaster` for testing/dev
 - Always call `shutdown_broadcaster()` on cleanup
+- Use `clear_retained(topic)` to remove sticky retained messages from broker
 
 Events published: `started`, `progress`, `completed`, `failed` with job_id and metadata.
 
@@ -96,18 +96,18 @@ Events published: `started`, `progress`, `completed`, `failed` with job_id and m
 
 To create a new compute module:
 
-1. Subclass `ComputeModule` (compute.py:35)
+1. Import and subclass `ComputeModule` from `cl_media_tools.common.compute_module`
 2. Implement `supported_task_types` property returning list of task type strings
 3. Implement async `process()` method with signature:
    ```python
    async def process(
        self, job_id: str, task_type: str,
-       params: ComputeJobParams,
+       params: dict,  # Raw dict from JSON, validated by cl_media_tools
        progress_callback: Optional[Callable[[int], None]] = None
    ) -> Dict[str, Any]
    ```
 4. Return dict with keys: `status` ("ok"/"error"), `task_output`, `error` (optional)
-5. Call `run_compute_job(module)` in `if __name__ == "__main__"`
+5. Call `run_compute_job(module)` from `cl_server_shared` in `if __name__ == "__main__"`
 
 The `run_compute_job()` function handles all infrastructure:
 - CLI argument parsing (--job-id)
@@ -119,15 +119,7 @@ The `run_compute_job()` function handles all infrastructure:
 
 ### Parameter Validation
 
-All compute job parameters use **Pydantic models** (schemas.py):
-- `ComputeJobParams` - Base class with input/output paths
-- `ImageResizeParams` - Extends base with width/height
-- `ImageConversionParams` - Extends base with format/quality
-
-Validators ensure:
-- Output paths are unique
-- Input and output path counts match
-- At least one input path provided
+All compute job parameters are defined in `cl_media_tools.common.schemas` as Pydantic models. The compute module receives parameters as a dict and cl_media_tools handles validation.
 
 ### Database Models
 
@@ -169,6 +161,17 @@ SessionLocal = create_session_factory(engine)
 from cl_server_shared import get_db_session
 app.dependency(Depends(lambda: get_db_session(SessionLocal)))
 ```
+
+### Adapters for cl_media_tools
+
+**SQLAlchemyJobRepository** (adapters.py:32) - Bridges cl_media_tools JobRepository protocol with SQLAlchemy:
+- Maps between library Job (7 fields) and database Job (14 fields)
+- Handles JSON serialization, timestamps, retry logic
+- `fetch_next_job()` uses optimistic locking for atomic job claiming
+
+**FileStorageAdapter** (adapters.py:322) - Wraps FileStorageService for cl_media_tools FileStorage protocol:
+- Manages job directories with input/output subdirectories
+- Converts relative paths to absolute paths for library compatibility
 
 ### File Storage Service
 `FileStorageService` manages media files with job-specific directories:
