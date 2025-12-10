@@ -280,7 +280,7 @@ The `run_compute_job` function executes compute modules from `cl_ml_tools`. It h
 
 ```python
 # my_image_module.py
-from cl_ml_tools.common.compute_module import ComputeModule
+from cl_ml_tools import ComputeModule
 from cl_server_shared import run_compute_job
 from PIL import Image
 from pathlib import Path

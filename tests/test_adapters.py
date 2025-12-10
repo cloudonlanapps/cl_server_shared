@@ -16,7 +16,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # Library schemas
-from cl_ml_tools.common.schemas import Job as LibraryJob
+from cl_ml_tools import Job as LibraryJob
 
 # Application models and adapters
 from cl_server_shared.models.job import Job as DatabaseJob

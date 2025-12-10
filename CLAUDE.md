@@ -96,7 +96,7 @@ Events published: `started`, `progress`, `completed`, `failed` with job_id and m
 
 To create a new compute module:
 
-1. Import and subclass `ComputeModule` from `cl_ml_tools.common.compute_module`
+1. Import and subclass `ComputeModule` from `cl_ml_tools`
 2. Implement `supported_task_types` property returning list of task type strings
 3. Implement async `process()` method with signature:
    ```python
@@ -119,7 +119,7 @@ The `run_compute_job()` function handles all infrastructure:
 
 ### Parameter Validation
 
-All compute job parameters are defined in `cl_ml_tools.common.schemas` as Pydantic models. The compute module receives parameters as a dict and cl_ml_tools handles validation.
+All compute job parameters are defined in `cl_ml_tools` as Pydantic models. The compute module receives parameters as a dict and cl_ml_tools handles validation.
 
 ### Database Models
 
