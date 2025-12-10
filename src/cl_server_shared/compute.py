@@ -10,17 +10,26 @@ from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy.orm import sessionmaker
 
-# Import ComputeModule from cl_media_tools (optional for testing)
+# Import ComputeModule from cl_ml_tools (optional for testing)
 try:
-    from cl_media_tools.common.compute_module import ComputeModule
+    from cl_ml_tools.common.compute_module import ComputeModule
 except ImportError:
-    # Define a placeholder if cl_media_tools is not installed
+    # Define a placeholder if cl_ml_tools is not installed
     from typing import Protocol
+
     class ComputeModule(Protocol):
-        """Placeholder for ComputeModule when cl_media_tools is not available."""
+        """Placeholder for ComputeModule when cl_ml_tools is not available."""
+
         @property
         def supported_task_types(self) -> List[str]: ...
-        async def process(self, job_id: str, task_type: str, params: Dict[str, Any], progress_callback: Optional[Callable[[int], None]] = None) -> Dict[str, Any]: ...
+        async def process(
+            self,
+            job_id: str,
+            task_type: str,
+            params: Dict[str, Any],
+            progress_callback: Optional[Callable[[int], None]] = None,
+        ) -> Dict[str, Any]: ...
+
 
 from .config import (
     WORKER_DATABASE_URL,
@@ -56,7 +65,7 @@ def _execute_async_module(module, job_id, task_type, params, progress_callback):
 def run_compute_job(module: ComputeModule):
     """
     Run a compute job using the provided module.
-    
+
     This function handles:
     1. Parsing command line arguments (job_id)
     2. Setting up database and MQTT connection
@@ -74,7 +83,7 @@ def run_compute_job(module: ComputeModule):
 
     # Setup database
     engine = create_db_engine(WORKER_DATABASE_URL)
-    
+
     # Create tables if they don't exist (safety check)
     Base.metadata.create_all(engine)
 
@@ -86,7 +95,7 @@ def run_compute_job(module: ComputeModule):
         broadcast_type=BROADCAST_TYPE,
         broker=MQTT_BROKER,
         port=MQTT_PORT,
-        topic=MQTT_TOPIC
+        topic=MQTT_TOPIC,
     )
 
     try:
@@ -109,7 +118,9 @@ def run_compute_job(module: ComputeModule):
 
         # Verify module supports this task
         if task_type not in module.supported_task_types:
-            logger.warning(f"Module supports {module.supported_task_types}, but job is {task_type}")
+            logger.warning(
+                f"Module supports {module.supported_task_types}, but job is {task_type}"
+            )
 
         try:
             params = json.loads(job.params)
@@ -144,9 +155,7 @@ def run_compute_job(module: ComputeModule):
             job.task_output = json.dumps(task_output)
             job.completed_at = int(time.time() * 1000)
             db.commit()
-            broadcaster.publish_event(
-                "completed", job_id, {"task_output": task_output}
-            )
+            broadcaster.publish_event("completed", job_id, {"task_output": task_output})
         else:
             logger.error(f"Job failed: {error}")
             job.status = "error"

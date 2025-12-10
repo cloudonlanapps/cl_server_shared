@@ -1,6 +1,6 @@
-"""Adapter implementations for cl_media_tools protocols.
+"""Adapter implementations for cl_ml_tools protocols.
 
-This module provides adapter classes that bridge the cl_media_tools library
+This module provides adapter classes that bridge the cl_ml_tools library
 protocols (JobRepository and FileStorage) with the application's actual
 implementations (SQLAlchemy database and FileStorageService).
 
@@ -21,9 +21,9 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 # Library protocols and schemas
-from cl_media_tools.common.job_repository import JobRepository
-from cl_media_tools.common.file_storage import FileStorage
-from cl_media_tools.common.schemas import Job as LibraryJob
+from cl_ml_tools.common.job_repository import JobRepository
+from cl_ml_tools.common.file_storage import FileStorage
+from cl_ml_tools.common.schemas import Job as LibraryJob
 
 # Application models and services
 from .models.job import Job as DatabaseJob
@@ -42,7 +42,7 @@ from .mqtt import get_broadcaster
 class SQLAlchemyJobRepository:
     """SQLAlchemy implementation of JobRepository protocol.
 
-    This adapter bridges the cl_media_tools JobRepository protocol with
+    This adapter bridges the cl_ml_tools JobRepository protocol with
     SQLAlchemy database operations. It handles:
 
     - Mapping library Job (7 fields) ↔ database Job (14 fields)
@@ -364,7 +364,7 @@ class FileStorageAdapter:
     """Adapter wrapping FileStorageService to implement FileStorage protocol.
 
     This is a thin wrapper that adapts the existing FileStorageService
-    to satisfy the cl_media_tools FileStorage protocol. Most methods
+    to satisfy the cl_ml_tools FileStorage protocol. Most methods
     are simple pass-throughs, but some handle path conversions.
 
     The FileStorage protocol expects absolute paths, and FileStorageService
@@ -375,7 +375,7 @@ class FileStorageAdapter:
         file_storage_service = FileStorageService("/path/to/media")
         adapter = FileStorageAdapter(file_storage_service)
 
-        # Now adapter can be passed to cl_media_tools functions
+        # Now adapter can be passed to cl_ml_tools functions
         job_dir = adapter.create_job_directory(job_id)
         input_path = adapter.get_input_path(job_id)
     """

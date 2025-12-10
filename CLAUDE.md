@@ -96,13 +96,13 @@ Events published: `started`, `progress`, `completed`, `failed` with job_id and m
 
 To create a new compute module:
 
-1. Import and subclass `ComputeModule` from `cl_media_tools.common.compute_module`
+1. Import and subclass `ComputeModule` from `cl_ml_tools.common.compute_module`
 2. Implement `supported_task_types` property returning list of task type strings
 3. Implement async `process()` method with signature:
    ```python
    async def process(
        self, job_id: str, task_type: str,
-       params: dict,  # Raw dict from JSON, validated by cl_media_tools
+       params: dict,  # Raw dict from JSON, validated by cl_ml_tools
        progress_callback: Optional[Callable[[int], None]] = None
    ) -> Dict[str, Any]
    ```
@@ -119,7 +119,7 @@ The `run_compute_job()` function handles all infrastructure:
 
 ### Parameter Validation
 
-All compute job parameters are defined in `cl_media_tools.common.schemas` as Pydantic models. The compute module receives parameters as a dict and cl_media_tools handles validation.
+All compute job parameters are defined in `cl_ml_tools.common.schemas` as Pydantic models. The compute module receives parameters as a dict and cl_ml_tools handles validation.
 
 ### Database Models
 
@@ -162,14 +162,14 @@ from cl_server_shared import get_db_session
 app.dependency(Depends(lambda: get_db_session(SessionLocal)))
 ```
 
-### Adapters for cl_media_tools
+### Adapters for cl_ml_tools
 
-**SQLAlchemyJobRepository** (adapters.py:32) - Bridges cl_media_tools JobRepository protocol with SQLAlchemy:
+**SQLAlchemyJobRepository** (adapters.py:32) - Bridges cl_ml_tools JobRepository protocol with SQLAlchemy:
 - Maps between library Job (7 fields) and database Job (14 fields)
 - Handles JSON serialization, timestamps, retry logic
 - `fetch_next_job()` uses optimistic locking for atomic job claiming
 
-**FileStorageAdapter** (adapters.py:322) - Wraps FileStorageService for cl_media_tools FileStorage protocol:
+**FileStorageAdapter** (adapters.py:322) - Wraps FileStorageService for cl_ml_tools FileStorage protocol:
 - Manages job directories with input/output subdirectories
 - Converts relative paths to absolute paths for library compatibility
 

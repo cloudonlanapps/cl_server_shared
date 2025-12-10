@@ -83,13 +83,13 @@ broadcaster = get_broadcaster(
 
 ### SQLAlchemyJobRepository
 
-The `SQLAlchemyJobRepository` adapter bridges the `cl_media_tools` JobRepository protocol with SQLAlchemy database operations. It handles mapping between the library's minimal Job schema and the database's full Job model.
+The `SQLAlchemyJobRepository` adapter bridges the `cl_ml_tools` JobRepository protocol with SQLAlchemy database operations. It handles mapping between the library's minimal Job schema and the database's full Job model.
 
 ```python
 from cl_server_shared import create_db_engine, create_session_factory
 from cl_server_shared.adapters import SQLAlchemyJobRepository
 from cl_server_shared.config import Config
-from cl_media_tools.common.schemas import Job as LibraryJob
+from cl_ml_tools.common.schemas import Job as LibraryJob
 from uuid import uuid4
 
 # Setup database and repository
@@ -142,7 +142,7 @@ Key methods:
 
 ### FileStorageAdapter
 
-The `FileStorageAdapter` wraps `FileStorageService` to implement the `cl_media_tools` FileStorage protocol. It manages job directories and file operations.
+The `FileStorageAdapter` wraps `FileStorageService` to implement the `cl_ml_tools` FileStorage protocol. It manages job directories and file operations.
 
 ```python
 from cl_server_shared import FileStorageService
@@ -276,11 +276,11 @@ Key methods:
 
 ### run_compute_job
 
-The `run_compute_job` function executes compute modules from `cl_media_tools`. It handles the complete job lifecycle including database updates, MQTT events, progress tracking, and error handling.
+The `run_compute_job` function executes compute modules from `cl_ml_tools`. It handles the complete job lifecycle including database updates, MQTT events, progress tracking, and error handling.
 
 ```python
 # my_image_module.py
-from cl_media_tools.common.compute_module import ComputeModule
+from cl_ml_tools.common.compute_module import ComputeModule
 from cl_server_shared import run_compute_job
 from PIL import Image
 from pathlib import Path

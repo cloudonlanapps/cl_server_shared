@@ -1,7 +1,7 @@
 """Unit tests for adapter implementations.
 
 Tests SQLAlchemyJobRepository and FileStorageAdapter classes that bridge
-cl_media_tools library protocols with application implementations.
+cl_ml_tools library protocols with application implementations.
 """
 
 import json
@@ -16,7 +16,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # Library schemas
-from cl_media_tools.common.schemas import Job as LibraryJob
+from cl_ml_tools.common.schemas import Job as LibraryJob
 
 # Application models and adapters
 from cl_server_shared.models.job import Job as DatabaseJob
@@ -28,6 +28,7 @@ from cl_server_shared.file_storage import FileStorageService
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def test_engine():
@@ -89,10 +90,10 @@ def sample_library_job():
             "input_paths": ["/tmp/input.jpg"],
             "output_paths": ["/tmp/output.jpg"],
             "width": 800,
-            "height": 600
+            "height": 600,
         },
         status="queued",
-        progress=0
+        progress=0,
     )
 
 
@@ -100,15 +101,14 @@ def sample_library_job():
 # SQLAlchemyJobRepository Tests
 # ============================================================================
 
+
 class TestSQLAlchemyJobRepository:
     """Test suite for SQLAlchemyJobRepository adapter."""
 
     def test_add_job(self, repository, sample_library_job):
         """Test adding a job to the database."""
         job_id = repository.add_job(
-            sample_library_job,
-            created_by="test_user",
-            priority=5
+            sample_library_job, created_by="test_user", priority=5
         )
 
         assert job_id == sample_library_job.job_id
@@ -122,15 +122,19 @@ class TestSQLAlchemyJobRepository:
         assert retrieved_job.status == "queued"
         assert retrieved_job.progress == 0
 
-    def test_add_job_with_database_fields(self, repository, session_factory, sample_library_job):
+    def test_add_job_with_database_fields(
+        self, repository, session_factory, sample_library_job
+    ):
         """Test that add_job adds database-specific fields correctly."""
         repository.add_job(sample_library_job, created_by="user123")
 
         # Check database directly
         with session_factory() as session:
-            db_job = session.query(DatabaseJob).filter_by(
-                job_id=sample_library_job.job_id
-            ).first()
+            db_job = (
+                session.query(DatabaseJob)
+                .filter_by(job_id=sample_library_job.job_id)
+                .first()
+            )
 
             assert db_job is not None
             assert db_job.created_at is not None
@@ -141,15 +145,19 @@ class TestSQLAlchemyJobRepository:
             assert db_job.started_at is None
             assert db_job.completed_at is None
 
-    def test_add_job_serializes_params(self, repository, session_factory, sample_library_job):
+    def test_add_job_serializes_params(
+        self, repository, session_factory, sample_library_job
+    ):
         """Test that params dict is serialized to JSON string."""
         repository.add_job(sample_library_job)
 
         # Check database directly
         with session_factory() as session:
-            db_job = session.query(DatabaseJob).filter_by(
-                job_id=sample_library_job.job_id
-            ).first()
+            db_job = (
+                session.query(DatabaseJob)
+                .filter_by(job_id=sample_library_job.job_id)
+                .first()
+            )
 
             # params should be JSON string in database
             assert isinstance(db_job.params, str)
@@ -209,7 +217,7 @@ class TestSQLAlchemyJobRepository:
 
         task_output = {
             "processed_files": ["/tmp/output.jpg"],
-            "dimensions": {"width": 800, "height": 600}
+            "dimensions": {"width": 800, "height": 600},
         }
         repository.update_job(sample_library_job.job_id, task_output=task_output)
 
@@ -227,7 +235,9 @@ class TestSQLAlchemyJobRepository:
         updated_job = repository.get_job(sample_library_job.job_id)
         assert updated_job.error_message == error_msg
 
-    def test_update_job_sets_started_at(self, repository, session_factory, sample_library_job):
+    def test_update_job_sets_started_at(
+        self, repository, session_factory, sample_library_job
+    ):
         """Test that updating status to 'processing' sets started_at timestamp."""
         repository.add_job(sample_library_job)
 
@@ -235,14 +245,18 @@ class TestSQLAlchemyJobRepository:
 
         # Check database directly
         with session_factory() as session:
-            db_job = session.query(DatabaseJob).filter_by(
-                job_id=sample_library_job.job_id
-            ).first()
+            db_job = (
+                session.query(DatabaseJob)
+                .filter_by(job_id=sample_library_job.job_id)
+                .first()
+            )
 
             assert db_job.started_at is not None
             assert db_job.started_at > 0
 
-    def test_update_job_sets_completed_at(self, repository, session_factory, sample_library_job):
+    def test_update_job_sets_completed_at(
+        self, repository, session_factory, sample_library_job
+    ):
         """Test that updating status to 'completed' sets completed_at timestamp."""
         repository.add_job(sample_library_job)
 
@@ -250,14 +264,18 @@ class TestSQLAlchemyJobRepository:
 
         # Check database directly
         with session_factory() as session:
-            db_job = session.query(DatabaseJob).filter_by(
-                job_id=sample_library_job.job_id
-            ).first()
+            db_job = (
+                session.query(DatabaseJob)
+                .filter_by(job_id=sample_library_job.job_id)
+                .first()
+            )
 
             assert db_job.completed_at is not None
             assert db_job.completed_at > 0
 
-    def test_update_job_sets_completed_at_on_error(self, repository, session_factory, sample_library_job):
+    def test_update_job_sets_completed_at_on_error(
+        self, repository, session_factory, sample_library_job
+    ):
         """Test that updating status to 'error' sets completed_at timestamp."""
         repository.add_job(sample_library_job)
 
@@ -265,9 +283,11 @@ class TestSQLAlchemyJobRepository:
 
         # Check database directly
         with session_factory() as session:
-            db_job = session.query(DatabaseJob).filter_by(
-                job_id=sample_library_job.job_id
-            ).first()
+            db_job = (
+                session.query(DatabaseJob)
+                .filter_by(job_id=sample_library_job.job_id)
+                .first()
+            )
 
             assert db_job.completed_at is not None
             assert db_job.completed_at > 0
@@ -294,7 +314,7 @@ class TestSQLAlchemyJobRepository:
             job_id=str(uuid4()),
             task_type="image_conversion",
             params={},
-            status="queued"
+            status="queued",
         )
         repository.add_job(job1)
 
@@ -309,7 +329,7 @@ class TestSQLAlchemyJobRepository:
             job_id=str(uuid4()),
             task_type="image_conversion",
             params={},
-            status="queued"
+            status="queued",
         )
         repository.add_job(job1)
 
@@ -325,7 +345,7 @@ class TestSQLAlchemyJobRepository:
             job_id=str(uuid4()),
             task_type="image_resize",
             params={},
-            status="processing"
+            status="processing",
         )
         repository.add_job(job1)
         # Manually set status to processing
@@ -339,10 +359,7 @@ class TestSQLAlchemyJobRepository:
         """Test that fetch_next_job returns oldest job first."""
         # Add multiple jobs with different timestamps
         job1 = LibraryJob(
-            job_id=str(uuid4()),
-            task_type="image_resize",
-            params={},
-            status="queued"
+            job_id=str(uuid4()), task_type="image_resize", params={}, status="queued"
         )
         repository.add_job(job1)
 
@@ -350,10 +367,7 @@ class TestSQLAlchemyJobRepository:
         time.sleep(0.01)
 
         job2 = LibraryJob(
-            job_id=str(uuid4()),
-            task_type="image_resize",
-            params={},
-            status="queued"
+            job_id=str(uuid4()), task_type="image_resize", params={}, status="queued"
         )
         repository.add_job(job2)
 
@@ -373,10 +387,7 @@ class TestSQLAlchemyJobRepository:
     def test_fetch_next_job_atomicity(self, repository):
         """Test that fetch_next_job is atomic (optimistic locking works)."""
         job1 = LibraryJob(
-            job_id=str(uuid4()),
-            task_type="image_resize",
-            params={},
-            status="queued"
+            job_id=str(uuid4()), task_type="image_resize", params={}, status="queued"
         )
         repository.add_job(job1)
 
@@ -408,6 +419,7 @@ class TestSQLAlchemyJobRepository:
 # ============================================================================
 # FileStorageAdapter Tests
 # ============================================================================
+
 
 class TestFileStorageAdapter:
     """Test suite for FileStorageAdapter."""
@@ -456,10 +468,7 @@ class TestFileStorageAdapter:
 
         # Create mock UploadFile
         file_content = b"Test file content"
-        file = UploadFile(
-            filename="test.txt",
-            file=BytesIO(file_content)
-        )
+        file = UploadFile(filename="test.txt", file=BytesIO(file_content))
 
         result = await file_storage_adapter.save_input_file(job_id, "test.txt", file)
 
@@ -501,6 +510,7 @@ class TestFileStorageAdapter:
 # Integration Tests
 # ============================================================================
 
+
 class TestAdapterIntegration:
     """Integration tests for adapters working together."""
 
@@ -517,7 +527,9 @@ class TestAdapterIntegration:
         # 2. Save input file
         file_content = b"Test image content"
         file = UploadFile(filename="input.jpg", file=BytesIO(file_content))
-        file_info = await file_storage_adapter.save_input_file(job_id, "input.jpg", file)
+        file_info = await file_storage_adapter.save_input_file(
+            job_id, "input.jpg", file
+        )
 
         input_path = file_info["path"]
         output_path = str(file_storage_adapter.get_output_path(job_id) / "output.jpg")
@@ -530,9 +542,9 @@ class TestAdapterIntegration:
                 "input_paths": [input_path],
                 "output_paths": [output_path],
                 "width": 100,
-                "height": 100
+                "height": 100,
             },
-            status="queued"
+            status="queued",
         )
         repository.add_job(library_job, created_by="test_user")
 
@@ -547,10 +559,7 @@ class TestAdapterIntegration:
         # 6. Mark complete with output
         task_output = {"processed_files": [output_path]}
         repository.update_job(
-            job_id,
-            status="completed",
-            progress=100,
-            task_output=task_output
+            job_id, status="completed", progress=100, task_output=task_output
         )
 
         # 7. Verify final state
