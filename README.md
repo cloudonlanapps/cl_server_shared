@@ -188,7 +188,8 @@ Key methods:
 The `MQTTBroadcaster` publishes job events and worker status to an MQTT broker. It's used internally by `run_compute_job` but can also be used directly for custom event broadcasting.
 
 ```python
-from cl_server_shared import MQTTBroadcaster, get_broadcaster, shutdown_broadcaster
+from cl_ml_tools import MQTTBroadcaster
+from cl_server_shared.mqtt_instance import get_broadcaster, shutdown_broadcaster
 from cl_server_shared.config import Config
 import json
 import time

@@ -1,6 +1,9 @@
 """Common configuration validation utilities."""
+
 import os
 from pathlib import Path
+from typing import Optional
+
 
 def get_cl_server_dir() -> str:
     """Get and validate CL_SERVER_DIR environment variable.
@@ -16,17 +19,22 @@ def get_cl_server_dir() -> str:
         raise ValueError("CL_SERVER_DIR environment variable must be set")
 
     if not os.access(cl_server_dir, os.W_OK):
-        raise ValueError(f"CL_SERVER_DIR does not exist or no write permission: {cl_server_dir}")
+        raise ValueError(
+            f"CL_SERVER_DIR does not exist or no write permission: {cl_server_dir}"
+        )
 
     return cl_server_dir
 
-def get_config_value(key: str, default: str = None) -> str:
+
+def get_config_value(key: str, default: Optional[str] = None) -> Optional[str]:
     """Get configuration value from environment with optional default."""
     return os.getenv(key, default)
+
 
 def get_int_config(key: str, default: int) -> int:
     """Get integer configuration value."""
     return int(os.getenv(key, str(default)))
+
 
 def get_bool_config(key: str, default: bool = False) -> bool:
     """Get boolean configuration value."""

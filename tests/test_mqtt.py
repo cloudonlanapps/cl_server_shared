@@ -11,17 +11,13 @@ from uuid import uuid4
 
 import pytest
 
-from cl_server_shared.mqtt import (
-    MQTTBroadcaster,
-    NoOpBroadcaster,
-    get_broadcaster,
-    shutdown_broadcaster,
-)
-
+from cl_ml_tools import MQTTBroadcaster, NoOpBroadcaster
+from cl_server_shared.mqtt_instance import get_broadcaster, shutdown_broadcaster
 
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def is_mqtt_running(host="localhost", port=1883, timeout=2):
     """Check if MQTT broker is running on specified host:port.
@@ -54,6 +50,7 @@ def skip_if_no_mqtt():
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def test_topic():
     """Generate unique test topic for each test."""
@@ -64,7 +61,7 @@ def test_topic():
 def mqtt_broadcaster(test_topic):
     """Create MQTTBroadcaster instance for testing."""
     skip_if_no_mqtt()
-    broadcaster = MQTTBroadcaster(broker="localhost", port=1883, topic=test_topic)
+    broadcaster = MQTTBroadcaster(broker="localhost", port=1883)
     yield broadcaster
     # Cleanup
     broadcaster.disconnect()
@@ -80,6 +77,7 @@ def noop_broadcaster(test_topic):
 # NoOpBroadcaster Tests (Always Run)
 # ============================================================================
 
+
 class TestNoOpBroadcaster:
     """Test suite for NoOpBroadcaster."""
 
@@ -94,25 +92,19 @@ class TestNoOpBroadcaster:
     def test_publish_event(self, noop_broadcaster):
         """Test NoOp publish_event always succeeds."""
         result = noop_broadcaster.publish_event(
-            event_type="test",
-            job_id="job-123",
-            data={"status": "processing"}
+            event_type="test", job_id="job-123", data={"status": "processing"}
         )
         assert result is True
 
     def test_set_will(self, noop_broadcaster):
         """Test NoOp set_will always succeeds."""
-        result = noop_broadcaster.set_will(
-            topic="test/will",
-            payload="offline"
-        )
+        result = noop_broadcaster.set_will(topic="test/will", payload="offline")
         assert result is True
 
     def test_publish_retained(self, noop_broadcaster):
         """Test NoOp publish_retained always succeeds."""
         result = noop_broadcaster.publish_retained(
-            topic="test/retained",
-            payload="test message"
+            topic="test/retained", payload="test message"
         )
         assert result is True
 
@@ -126,6 +118,7 @@ class TestNoOpBroadcaster:
 # MQTTBroadcaster Tests (Require MQTT Broker)
 # ============================================================================
 
+
 class TestMQTTBroadcaster:
     """Test suite for MQTTBroadcaster.
 
@@ -136,8 +129,10 @@ class TestMQTTBroadcaster:
     def test_mqtt_broker_running(self):
         """Test that MQTT broker is running on localhost:1883."""
         if not is_mqtt_running():
-            pytest.fail("MQTT broker is not running on localhost:1883. "
-                       "Please start MQTT broker to run these tests.")
+            pytest.fail(
+                "MQTT broker is not running on localhost:1883. "
+                "Please start MQTT broker to run these tests."
+            )
 
     def test_connect(self, mqtt_broadcaster):
         """Test connecting to MQTT broker."""
@@ -160,7 +155,7 @@ class TestMQTTBroadcaster:
         result = mqtt_broadcaster.publish_event(
             event_type="started",
             job_id=job_id,
-            data={"status": "processing", "progress": 0}
+            data={"status": "processing", "progress": 0},
         )
 
         assert result is True
@@ -180,18 +175,17 @@ class TestMQTTBroadcaster:
 
     def test_publish_event_without_connection(self, test_topic):
         """Test publish_event fails without connection."""
-        broadcaster = MQTTBroadcaster(
-            broker="localhost",
-            port=1883,
-            topic=test_topic
-        )
+        broadcaster = MQTTBroadcaster(broker="localhost", port=1883)
         # Don't connect
 
-        result = broadcaster.publish_event(
-            event_type="test",
-            job_id="job-123",
-            data={}
+        payload = json.dumps(
+            {
+                "job_id": "job-123",
+                "event_type": "test",
+                "timestamp": int(time.time() * 1000),
+            }
         )
+        result = broadcaster.publish_event(topic=test_topic, payload=payload)
 
         assert result is False
 
@@ -233,11 +227,13 @@ class TestMQTTBroadcaster:
         will_payload = json.dumps({"status": "offline"})
 
         # Create broadcaster and connect first
-        broadcaster = MQTTBroadcaster(broker="localhost", port=1883, topic=test_topic)
+        broadcaster = MQTTBroadcaster(broker="localhost", port=1883)
         broadcaster.connect()
 
         # Set will after connecting (limitation of current implementation)
-        result = broadcaster.set_will(will_topic, will_payload, qos=1, retain=True)
+        result = broadcaster.set_will(
+            topic=will_topic, payload=will_payload, qos=1, retain=True
+        )
         assert result is True
 
         # Cleanup
@@ -281,6 +277,7 @@ class TestMQTTBroadcaster:
 # Global Broadcaster Tests
 # ============================================================================
 
+
 class TestGlobalBroadcaster:
     """Test suite for global broadcaster singleton."""
 
@@ -297,10 +294,7 @@ class TestGlobalBroadcaster:
         skip_if_no_mqtt()
 
         broadcaster = get_broadcaster(
-            broadcast_type="mqtt",
-            broker="localhost",
-            port=1883,
-            topic="test/events"
+            broadcast_type="mqtt", broker="localhost", port=1883
         )
 
         assert isinstance(broadcaster, MQTTBroadcaster)
@@ -309,10 +303,7 @@ class TestGlobalBroadcaster:
     def test_get_broadcaster_noop(self):
         """Test getting NoOp broadcaster."""
         broadcaster = get_broadcaster(
-            broadcast_type="noop",
-            broker="localhost",
-            port=1883,
-            topic="test/events"
+            broadcast_type="noop", broker="localhost", port=1883
         )
 
         assert isinstance(broadcaster, NoOpBroadcaster)
@@ -320,17 +311,11 @@ class TestGlobalBroadcaster:
     def test_get_broadcaster_singleton(self):
         """Test that get_broadcaster returns same instance."""
         broadcaster1 = get_broadcaster(
-            broadcast_type="noop",
-            broker="localhost",
-            port=1883,
-            topic="test/events"
+            broadcast_type="noop", broker="localhost", port=1883
         )
 
         broadcaster2 = get_broadcaster(
-            broadcast_type="noop",
-            broker="localhost",
-            port=1883,
-            topic="test/events"
+            broadcast_type="noop", broker="localhost", port=1883
         )
 
         assert broadcaster1 is broadcaster2
@@ -338,10 +323,7 @@ class TestGlobalBroadcaster:
     def test_shutdown_broadcaster(self):
         """Test shutting down global broadcaster."""
         broadcaster = get_broadcaster(
-            broadcast_type="noop",
-            broker="localhost",
-            port=1883,
-            topic="test/events"
+            broadcast_type="noop", broker="localhost", port=1883
         )
 
         assert broadcaster is not None
@@ -350,10 +332,7 @@ class TestGlobalBroadcaster:
 
         # After shutdown, getting broadcaster should create new instance
         new_broadcaster = get_broadcaster(
-            broadcast_type="noop",
-            broker="localhost",
-            port=1883,
-            topic="test/events"
+            broadcast_type="noop", broker="localhost", port=1883
         )
 
         assert new_broadcaster is not broadcaster
@@ -362,6 +341,7 @@ class TestGlobalBroadcaster:
 # ============================================================================
 # Integration Tests
 # ============================================================================
+
 
 class TestMQTTIntegration:
     """Integration tests for MQTT broadcaster in job workflow context."""
@@ -374,26 +354,20 @@ class TestMQTTIntegration:
 
         # Job queued (published by store service)
         result = mqtt_broadcaster.publish_event(
-            "queued",
-            job_id,
-            {"status": "queued", "task_type": "image_resize"}
+            "queued", job_id, {"status": "queued", "task_type": "image_resize"}
         )
         assert result is True
 
         # Job started (published by worker)
         result = mqtt_broadcaster.publish_event(
-            "started",
-            job_id,
-            {"status": "processing"}
+            "started", job_id, {"status": "processing"}
         )
         assert result is True
 
         # Progress updates
         for progress in [25, 50, 75]:
             result = mqtt_broadcaster.publish_event(
-                "progress",
-                job_id,
-                {"progress": progress}
+                "progress", job_id, {"progress": progress}
             )
             assert result is True
 
@@ -401,7 +375,7 @@ class TestMQTTIntegration:
         result = mqtt_broadcaster.publish_event(
             "completed",
             job_id,
-            {"task_output": {"output_files": ["/path/to/output.jpg"]}}
+            {"task_output": {"output_files": ["/path/to/output.jpg"]}},
         )
         assert result is True
 
@@ -416,8 +390,6 @@ class TestMQTTIntegration:
 
         # Job failed
         result = mqtt_broadcaster.publish_event(
-            "failed",
-            job_id,
-            {"error": "File not found: input.jpg"}
+            "failed", job_id, {"error": "File not found: input.jpg"}
         )
         assert result is True
