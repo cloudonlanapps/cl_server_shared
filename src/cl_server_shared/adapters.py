@@ -21,9 +21,9 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 # Library protocols and schemas
-from cl_ml_tools.common.job_repository import JobRepository
-from cl_ml_tools.common.file_storage import FileStorage
-from cl_ml_tools.common.schemas import Job as LibraryJob
+from cl_ml_tools import JobRepository
+from cl_ml_tools import FileStorage
+from cl_ml_tools import Job as LibraryJob
 
 # Application models and services
 from .models.job import Job as DatabaseJob
@@ -36,7 +36,7 @@ from .config import (
     MQTT_PORT,
     MQTT_TOPIC,
 )
-from .mqtt import get_broadcaster
+from .mqtt_instance import get_broadcaster
 
 
 class SQLAlchemyJobRepository:
@@ -81,7 +81,6 @@ class SQLAlchemyJobRepository:
             broadcast_type=BROADCAST_TYPE,
             broker=MQTT_BROKER,
             port=MQTT_PORT,
-            topic=MQTT_TOPIC,
         )
 
     def _db_to_library_job(self, db_job: DatabaseJob) -> LibraryJob:
@@ -270,10 +269,17 @@ class SQLAlchemyJobRepository:
             status: Current job status
             progress: Progress percentage (0-100)
         """
-        if not self.broadcaster.connected:
-            return
+        payload = {
+            "job_id": job_id,
+            "event_type": status,
+            "timestamp": int(time.time() * 1000),
+            "progress": progress,
+        }
 
-        self.broadcaster.publish_event(status, job_id, {"progress": progress})
+        if self.broadcaster:
+            self.broadcaster.publish_event(
+                topic=MQTT_TOPIC, payload=json.dumps(payload)
+            )
 
     def fetch_next_job(self, task_types: List[str]) -> Optional[LibraryJob]:
         """Atomically find and claim the next queued job.

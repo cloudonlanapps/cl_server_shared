@@ -89,7 +89,7 @@ The `SQLAlchemyJobRepository` adapter bridges the `cl_ml_tools` JobRepository pr
 from cl_server_shared import create_db_engine, create_session_factory
 from cl_server_shared.adapters import SQLAlchemyJobRepository
 from cl_server_shared.config import Config
-from cl_ml_tools.common.schemas import Job as LibraryJob
+from cl_ml_tools import Job as LibraryJob
 from uuid import uuid4
 
 # Setup database and repository

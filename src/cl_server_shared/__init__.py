@@ -14,9 +14,7 @@ from .models.job import Job
 from .models.queue import QueueEntry
 
 # MQTT
-from .mqtt import (
-    MQTTBroadcaster,
-    NoOpBroadcaster,
+from .mqtt_instance import (
     get_broadcaster,
     shutdown_broadcaster,
 )
@@ -50,8 +48,6 @@ from .config import (
 # Configuration module (all services)
 from . import config
 
-# Compute
-from .compute import run_compute_job
 
 __all__ = [
     # Database
@@ -63,9 +59,7 @@ __all__ = [
     # Models
     "Job",
     "QueueEntry",
-    # MQTT
-    "MQTTBroadcaster",
-    "NoOpBroadcaster",
+    # MQTT Instance
     "get_broadcaster",
     "shutdown_broadcaster",
     # File storage
@@ -91,6 +85,4 @@ __all__ = [
     "MQTT_PORT",
     "MQTT_TOPIC",
     "COMPUTE_STORAGE_DIR",
-    # Compute
-    "run_compute_job",
 ]

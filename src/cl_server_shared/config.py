@@ -2,7 +2,7 @@
 
 Usage:
     from cl_server_shared.config import Config
-    
+
     # Access config values
     database_url = Config.AUTH_DATABASE_URL
     storage_dir = Config.MEDIA_STORAGE_DIR
@@ -10,26 +10,26 @@ Usage:
 
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 class Config:
     """Centralized configuration for all CL Server services.
-    
+
     All configuration values are class variables that can be accessed directly.
     Values are loaded from environment variables with sensible defaults.
-    
+
     Example:
         from cl_server_shared.config import Config
-        
+
         print(Config.CL_SERVER_DIR)
         print(Config.AUTH_DATABASE_URL)
     """
-    
+
     # ========================================================================
     # Helper methods (static)
     # ========================================================================
-    
+
     @staticmethod
     def _get_cl_server_dir() -> str:
         """Get and validate CL_SERVER_DIR environment variable.
@@ -52,7 +52,7 @@ class Config:
         return cl_server_dir
 
     @staticmethod
-    def _get_value(key: str, default: str = None) -> str:
+    def _get_value(key: str, default: Optional[str] = None) -> Optional[str]:
         """Get configuration value from environment with optional default."""
         return os.getenv(key, default)
 
@@ -74,7 +74,7 @@ class Config:
     # ========================================================================
     # Common Configuration
     # ========================================================================
-    
+
     CL_SERVER_DIR: str = _get_cl_server_dir.__func__()
 
     # ========================================================================
@@ -83,19 +83,16 @@ class Config:
 
     # Auth service uses separate database
     AUTH_DATABASE_URL: str = _get_value.__func__(
-        "DATABASE_URL",
-        f"sqlite:///{CL_SERVER_DIR}/user_auth.db"
+        "DATABASE_URL", f"sqlite:///{CL_SERVER_DIR}/user_auth.db"
     )
 
     # Store service and worker share the same database
     STORE_DATABASE_URL: str = _get_value.__func__(
-        "DATABASE_URL",
-        f"sqlite:///{CL_SERVER_DIR}/media_store.db"
+        "DATABASE_URL", f"sqlite:///{CL_SERVER_DIR}/media_store.db"
     )
 
     WORKER_DATABASE_URL: str = _get_value.__func__(
-        "DATABASE_URL",
-        f"sqlite:///{CL_SERVER_DIR}/media_store.db"
+        "DATABASE_URL", f"sqlite:///{CL_SERVER_DIR}/media_store.db"
     )
 
     # ========================================================================
@@ -103,15 +100,15 @@ class Config:
     # ========================================================================
 
     PRIVATE_KEY_PATH: str = _get_value.__func__(
-        "PRIVATE_KEY_PATH", 
-        f"{CL_SERVER_DIR}/private_key.pem"
+        "PRIVATE_KEY_PATH", f"{CL_SERVER_DIR}/private_key.pem"
     )
     PUBLIC_KEY_PATH: str = _get_value.__func__(
-        "PUBLIC_KEY_PATH", 
-        f"{CL_SERVER_DIR}/public_key.pem"
+        "PUBLIC_KEY_PATH", f"{CL_SERVER_DIR}/public_key.pem"
     )
     ALGORITHM: str = "ES256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = _get_int.__func__("ACCESS_TOKEN_EXPIRE_MINUTES", 30)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = _get_int.__func__(
+        "ACCESS_TOKEN_EXPIRE_MINUTES", 30
+    )
     ADMIN_USERNAME: str = _get_value.__func__("ADMIN_USERNAME", "admin")
     ADMIN_PASSWORD: str = _get_value.__func__("ADMIN_PASSWORD", "admin")
 
@@ -120,12 +117,10 @@ class Config:
     # ========================================================================
 
     MEDIA_STORAGE_DIR: str = _get_value.__func__(
-        "MEDIA_STORAGE_DIR", 
-        f"{CL_SERVER_DIR}/media"
+        "MEDIA_STORAGE_DIR", f"{CL_SERVER_DIR}/media"
     )
     COMPUTE_STORAGE_DIR: str = _get_value.__func__(
-        "COMPUTE_STORAGE_DIR", 
-        f"{CL_SERVER_DIR}/compute"
+        "COMPUTE_STORAGE_DIR", f"{CL_SERVER_DIR}/compute"
     )
     AUTH_DISABLED: bool = _get_bool.__func__("AUTH_DISABLED", False)
     READ_AUTH_ENABLED: bool = _get_bool.__func__("READ_AUTH_ENABLED", False)
@@ -139,8 +134,7 @@ class Config:
     # Worker-specific
     WORKER_ID: str = _get_value.__func__("WORKER_ID", "worker-default")
     WORKER_SUPPORTED_TASKS: List[str] = _get_list.__func__(
-        "WORKER_SUPPORTED_TASKS",
-        "image_resize,image_conversion"
+        "WORKER_SUPPORTED_TASKS", "image_resize,image_conversion"
     )
     WORKER_POLL_INTERVAL: int = _get_int.__func__("WORKER_POLL_INTERVAL", 5)
 
@@ -154,8 +148,7 @@ class Config:
     MQTT_TOPIC: str = _get_value.__func__("MQTT_TOPIC", "inference/events")
     MQTT_HEARTBEAT_INTERVAL: int = _get_int.__func__("MQTT_HEARTBEAT_INTERVAL", 30)
     CAPABILITY_TOPIC_PREFIX: str = _get_value.__func__(
-        "CAPABILITY_TOPIC_PREFIX", 
-        "inference/workers"
+        "CAPABILITY_TOPIC_PREFIX", "inference/workers"
     )
     CAPABILITY_CACHE_TIMEOUT: int = _get_int.__func__("CAPABILITY_CACHE_TIMEOUT", 10)
 
@@ -207,17 +200,21 @@ CAPABILITY_CACHE_TIMEOUT = Config.CAPABILITY_CACHE_TIMEOUT
 # Backward Compatibility - Helper functions from base_config
 # ============================================================================
 
+
 def get_cl_server_dir() -> str:
     """Get and validate CL_SERVER_DIR. Use Config.CL_SERVER_DIR instead."""
     return Config._get_cl_server_dir()
 
-def get_config_value(key: str, default: str = None) -> str:
+
+def get_config_value(key: str, default: Optional[str] = None) -> Optional[str]:
     """Get config value. Use Config._get_value() instead."""
     return Config._get_value(key, default)
+
 
 def get_int_config(key: str, default: int) -> int:
     """Get int config. Use Config._get_int() instead."""
     return Config._get_int(key, default)
+
 
 def get_bool_config(key: str, default: bool = False) -> bool:
     """Get bool config. Use Config._get_bool() instead."""
