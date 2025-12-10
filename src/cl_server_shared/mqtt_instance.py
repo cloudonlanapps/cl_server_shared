@@ -9,7 +9,7 @@ _broadcaster_config: Optional[Dict[str, Any]] = None
 
 
 def get_broadcaster(
-    broadcast_type: str, broker: str, port: int
+    broadcast_type: str, broker: Optional[str] = None, port: Optional[int] = None
 ) -> Optional[Union[MQTTBroadcaster, NoOpBroadcaster]]:
     """Get or create global broadcaster instance based on config."""
     global _broadcaster, _broadcaster_config
@@ -37,7 +37,7 @@ def get_broadcaster(
         if broadcast_type == "mqtt":
             _broadcaster = MQTTBroadcaster(broker, port)
         else:
-            _broadcaster = NoOpBroadcaster()
+            _broadcaster = NoOpBroadcaster(broker, port)
         _broadcaster.connect()
 
         _broadcaster_config = desired_config
