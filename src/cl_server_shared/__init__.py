@@ -13,11 +13,6 @@ from .database import (
 from .models.job import Job
 from .models.queue import QueueEntry
 
-# MQTT
-from .mqtt_instance import (
-    get_broadcaster,
-    shutdown_broadcaster,
-)
 
 # File storage
 from .file_storage import FileStorageService
@@ -59,9 +54,6 @@ __all__ = [
     # Models
     "Job",
     "QueueEntry",
-    # MQTT Instance
-    "get_broadcaster",
-    "shutdown_broadcaster",
     # File storage
     "FileStorageService",
     # Config - NEW: use Config class

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cl-server-shared"
 version = "0.1.0"
-description = "Shared utilities for CL Server services - database, file storage, MQTT, and compute modules"
+description = "Shared utilities for CL Server services - database, file storage,  and compute modules"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
@@ -21,7 +21,6 @@ keywords = [
     "utilities",
     "database",
     "file-storage",
-    "mqtt",
     "compute",
     "media-processing",
 ]
@@ -42,12 +41,10 @@ classifiers = [
 dependencies = [
     "sqlalchemy>=2.0.0",
     "pydantic>=2.0.0",
+    "cl_ml_tools @ git+https://github.com/cloudonlanapps/cl_ml_tools.git",
 ]
 
 [project.optional-dependencies]
-mqtt = [
-    "paho-mqtt>=1.6.0",
-]
 fastapi = [
     "fastapi>=0.100.0",
     "python-multipart>=0.0.6",
@@ -55,14 +52,17 @@ fastapi = [
 compute = [
     "Pillow>=10.0.0",
 ]
-all = [
-    "cl-server-shared[mqtt,fastapi,compute]",
-]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
+]
+# 'all' extra combines the main optional groups
+all = [
+    "fastapi>=0.100.0",
+    "python-multipart>=0.0.6",
+    "Pillow>=10.0.0",
 ]
 
 [project.urls]

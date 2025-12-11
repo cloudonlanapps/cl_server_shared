@@ -12,6 +12,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Config` class for unified configuration management
 - Database utilities with SQLite WAL mode support
 - `Job` and `QueueEntry` models
-- MQTT broadcaster classes
 - `FileStorageService` for media file management
-- Compute module base classes
+- adapters !
