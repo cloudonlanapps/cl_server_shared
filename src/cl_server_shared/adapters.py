@@ -36,7 +36,7 @@ from .config import (
     MQTT_PORT,
     MQTT_TOPIC,
 )
-from .mqtt_instance import get_broadcaster
+from cl_ml_tools import get_broadcaster
 
 
 class SQLAlchemyJobRepository:

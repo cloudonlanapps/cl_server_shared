@@ -68,7 +68,7 @@ file_storage = FileStorageService(Config.MEDIA_STORAGE_DIR)
 ### MQTT Broadcasting
 
 ```python
-from cl_server_shared import get_broadcaster, shutdown_broadcaster
+from cl_ml_tools import get_broadcaster, shutdown_broadcaster
 from cl_server_shared.config import Config
 
 broadcaster = get_broadcaster(
