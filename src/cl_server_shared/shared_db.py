@@ -142,6 +142,7 @@ class SQLAlchemyJobRepository:
                 created_at=int(time.time() * 1000),  # Current timestamp in milliseconds
                 task_output=json.dumps(job.task_output) if job.task_output else None,
                 error_message=job.error_message,
+                priority=priority,
                 retry_count=0,
                 max_retries=3,
                 created_by=created_by,

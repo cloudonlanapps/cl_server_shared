@@ -1,9 +1,11 @@
 """Job model shared between store service and compute worker."""
+
 from typing import Optional
 from sqlalchemy import BigInteger, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from . import Base
+
 
 class Job(Base):
     """Job model storing compute job metadata, status, and results.
@@ -14,11 +16,13 @@ class Job(Base):
 
     Both services access the same database table.
     """
+
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     job_id: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     task_type: Mapped[str] = mapped_column(String, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False)
 
     params: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
 
