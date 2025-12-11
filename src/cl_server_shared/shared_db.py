@@ -25,17 +25,11 @@ from cl_ml_tools import JobRepository
 from cl_ml_tools import FileStorage
 from cl_ml_tools import Job as LibraryJob
 
-# Application models and services
-from .models.job import Job as DatabaseJob
-from .file_storage import FileStorageService
+# Application models
+from .models import Job, QueueEntry
 
 # MQTT broadcasting
-from .config import (
-    BROADCAST_TYPE,
-    MQTT_BROKER,
-    MQTT_PORT,
-    MQTT_TOPIC,
-)
+from .config import Config
 from cl_ml_tools import get_broadcaster
 
 
@@ -78,12 +72,12 @@ class SQLAlchemyJobRepository:
 
         # Setup broadcaster for job progress updates
         self.broadcaster = get_broadcaster(
-            broadcast_type=BROADCAST_TYPE,
-            broker=MQTT_BROKER,
-            port=MQTT_PORT,
+            broadcast_type=Config.BROADCAST_TYPE,
+            broker=Config.MQTT_BROKER,
+            port=Config.MQTT_PORT,
         )
 
-    def _db_to_library_job(self, db_job: DatabaseJob) -> LibraryJob:
+    def _db_to_library_job(self, db_job: Job) -> LibraryJob:
         """Convert database Job to library Job schema.
 
         Strips database-specific fields and parses JSON strings.
@@ -139,7 +133,7 @@ class SQLAlchemyJobRepository:
         """
         with self.session_factory() as session:
             # Convert library Job to database Job
-            db_job = DatabaseJob(
+            db_job = Job(
                 job_id=job.job_id,
                 task_type=job.task_type,
                 params=json.dumps(job.params),
@@ -168,7 +162,7 @@ class SQLAlchemyJobRepository:
             Library Job object if found, None otherwise
         """
         with self.session_factory() as session:
-            stmt = select(DatabaseJob).where(DatabaseJob.job_id == job_id)
+            stmt = select(Job).where(Job.job_id == job_id)
             db_job = session.execute(stmt).scalar_one_or_none()
 
             if db_job:
@@ -210,9 +204,7 @@ class SQLAlchemyJobRepository:
                 # Auto-set timestamps based on status
                 if kwargs["status"] == "processing":
                     # Check if started_at is not already set
-                    stmt = select(DatabaseJob.started_at).where(
-                        DatabaseJob.job_id == job_id
-                    )
+                    stmt = select(Job.started_at).where(Job.job_id == job_id)
                     started_at = session.execute(stmt).scalar_one_or_none()
                     if started_at is None:
                         update_values["started_at"] = int(time.time() * 1000)
@@ -247,11 +239,7 @@ class SQLAlchemyJobRepository:
                 return False
 
             # Execute update
-            stmt = (
-                update(DatabaseJob)
-                .where(DatabaseJob.job_id == job_id)
-                .values(**update_values)
-            )
+            stmt = update(Job).where(Job.job_id == job_id).values(**update_values)
             result = session.execute(stmt)
             session.commit()
 
@@ -278,7 +266,7 @@ class SQLAlchemyJobRepository:
 
         if self.broadcaster:
             self.broadcaster.publish_event(
-                topic=MQTT_TOPIC, payload=json.dumps(payload)
+                topic=Config.MQTT_TOPIC, payload=json.dumps(payload)
             )
 
     def fetch_next_job(self, task_types: List[str]) -> Optional[LibraryJob]:
@@ -306,12 +294,12 @@ class SQLAlchemyJobRepository:
             # Find next queued job with matching task type
             # Order by created_at to process oldest first
             stmt = (
-                select(DatabaseJob)
+                select(Job)
                 .where(
-                    DatabaseJob.status == "queued",
-                    DatabaseJob.task_type.in_(task_types),
+                    Job.status == "queued",
+                    Job.task_type.in_(task_types),
                 )
-                .order_by(DatabaseJob.created_at)
+                .order_by(Job.created_at)
                 .limit(1)
             )
 
@@ -324,10 +312,10 @@ class SQLAlchemyJobRepository:
             # This UPDATE will only succeed if status is still "queued"
             current_time = int(time.time() * 1000)
             stmt = (
-                update(DatabaseJob)
+                update(Job)
                 .where(
-                    DatabaseJob.job_id == db_job.job_id,
-                    DatabaseJob.status == "queued",  # Optimistic lock
+                    Job.job_id == db_job.job_id,
+                    Job.status == "queued",  # Optimistic lock
                 )
                 .values(status="processing", started_at=current_time)
             )
@@ -355,7 +343,7 @@ class SQLAlchemyJobRepository:
             True if job was deleted, False if job not found
         """
         with self.session_factory() as session:
-            stmt = select(DatabaseJob).where(DatabaseJob.job_id == job_id)
+            stmt = select(Job).where(Job.job_id == job_id)
             db_job = session.execute(stmt).scalar_one_or_none()
 
             if db_job:
@@ -366,104 +354,8 @@ class SQLAlchemyJobRepository:
             return False
 
 
-class FileStorageAdapter:
-    """Adapter wrapping FileStorageService to implement FileStorage protocol.
-
-    This is a thin wrapper that adapts the existing FileStorageService
-    to satisfy the cl_ml_tools FileStorage protocol. Most methods
-    are simple pass-throughs, but some handle path conversions.
-
-    The FileStorage protocol expects absolute paths, and FileStorageService
-    returns relative paths from save_input_file. This adapter handles the
-    conversion by using get_absolute_path.
-
-    Example:
-        file_storage_service = FileStorageService("/path/to/media")
-        adapter = FileStorageAdapter(file_storage_service)
-
-        # Now adapter can be passed to cl_ml_tools functions
-        job_dir = adapter.create_job_directory(job_id)
-        input_path = adapter.get_input_path(job_id)
-    """
-
-    def __init__(self, file_storage_service: FileStorageService):
-        """Initialize adapter with FileStorageService.
-
-        Args:
-            file_storage_service: Existing FileStorageService instance
-        """
-        self.service = file_storage_service
-
-    def create_job_directory(self, job_id: str) -> Path:
-        """Create job directory structure with input/output subdirectories.
-
-        Args:
-            job_id: Unique job identifier
-
-        Returns:
-            Absolute path to the job directory
-        """
-        return self.service.create_job_directory(job_id)
-
-    def get_input_path(self, job_id: str) -> Path:
-        """Get absolute path to job's input directory.
-
-        Args:
-            job_id: Unique job identifier
-
-        Returns:
-            Absolute path to the input directory
-        """
-        return self.service.get_input_path(job_id)
-
-    def get_output_path(self, job_id: str) -> Path:
-        """Get absolute path to job's output directory.
-
-        Args:
-            job_id: Unique job identifier
-
-        Returns:
-            Absolute path to the output directory
-        """
-        return self.service.get_output_path(job_id)
-
-    async def save_input_file(self, job_id: str, filename: str, file) -> dict:
-        """Save uploaded file to job's input directory.
-
-        Note: FileStorageService returns relative path in "path" field.
-        This is converted to absolute path to match protocol expectations.
-
-        Args:
-            job_id: Unique job identifier
-            filename: Target filename
-            file: File object (FastAPI UploadFile)
-
-        Returns:
-            Dict with file metadata:
-            {
-                "filename": str,  # Saved filename
-                "path": str,      # Absolute path to saved file (converted from relative)
-                "size": int,      # File size in bytes
-                "hash": str       # File hash (SHA256)
-            }
-        """
-        result = await self.service.save_input_file(job_id, filename, file)
-
-        # Convert relative path to absolute path
-        if "path" in result:
-            relative_path = result["path"]
-            absolute_path = self.service.get_absolute_path(relative_path)
-            result["path"] = str(absolute_path)
-
-        return result
-
-    def cleanup_job(self, job_id: str) -> bool:
-        """Delete job directory and all its files.
-
-        Args:
-            job_id: Unique job identifier
-
-        Returns:
-            True if deleted, False if directory didn't exist
-        """
-        return self.service.cleanup_job(job_id)
+__all__ = [
+    "Job",
+    "QueueEntry",
+    "SQLAlchemyJobRepository",
+]

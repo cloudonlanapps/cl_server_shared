@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy import BigInteger, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..database import Base
+from . import Base
 
 class Job(Base):
     """Job model storing compute job metadata, status, and results.

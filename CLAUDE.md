@@ -20,7 +20,9 @@ pytest tests/ -v
 pytest tests/ --cov=src/cl_server_shared --cov-report=term-missing
 
 # Run single test file
-pytest tests/test_adapters.py -v
+pytest tests/test_shared_db.py -v
+pytest tests/test_file_storage.py -v
+pytest tests/test_config.py -v
 ```
 
 ### Linting
@@ -71,20 +73,34 @@ The library is designed for a **multi-service architecture**:
 - Worker: Claims jobs, updates status/progress
 - Auth service: Uses separate database for user data
 
-All SQLite databases use **WAL mode** (Write-Ahead Logging) enabled via `enable_wal_mode()` for concurrent access. This is critical for multi-process scenarios.
+All SQLite databases should use **WAL mode** (Write-Ahead Logging) for concurrent access. Services configure this when creating engines.
+
+### Package Structure
+
+```
+src/cl_server_shared/
+├── __init__.py                    # Public API: Config, FileStorageService, Job, QueueEntry, SQLAlchemyJobRepository
+├── config.py                      # Config class - centralized configuration singleton
+├── file_storage.py                # FileStorageService (implements cl_ml_tools.FileStorage)
+├── shared_db.py                   # SQLAlchemyJobRepository (implements cl_ml_tools.JobRepository)
+└── models/
+    ├── __init__.py                # Base, Job, QueueEntry
+    ├── job.py                     # Job model
+    └── queue.py                   # QueueEntry model
+```
 
 ### Configuration System
 
 The `Config` class (config.py:16) is a **centralized configuration singleton**:
 - All values are class variables accessed directly: `Config.CL_SERVER_DIR`
 - Values loaded from environment variables with service-specific defaults
-- Backward compatibility: individual module-level variables exported
+- **No module-level variable exports** - use `Config.VARIABLE_NAME` pattern
 
 **Important**: `CL_SERVER_DIR` environment variable is **required** and must be writable. All file paths default relative to this directory.
 
 ### MQTT Event Broadcasting
 
-Global singleton pattern via `get_broadcaster()`:
+Built into `SQLAlchemyJobRepository` via `cl_ml_tools.get_broadcaster()`:
 - `MQTTBroadcaster` for production (paho-mqtt)
 - `NoOpBroadcaster` for testing/dev
 - Always call `shutdown_broadcaster()` on cleanup
@@ -139,45 +155,82 @@ All compute job parameters are defined in `cl_ml_tools` as Pydantic models. The 
 ## Important Patterns
 
 ### SQLAlchemy Base Class
-All models inherit from `Base` (database.py:6). When creating new models:
+All models inherit from `Base` (models/__init__.py:6). When creating new models:
 ```python
-from cl_server_shared.database import Base
+from cl_server_shared.models import Base
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Integer
 
 class MyModel(Base):
     __tablename__ = "my_table"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 ```
 
-### Session Factory Pattern
+### Database Access Pattern
+Services create their own engines and sessions:
 ```python
-from cl_server_shared import create_db_engine, create_session_factory
-from cl_server_shared.config import Config
+from cl_server_shared import Config, SQLAlchemyJobRepository
+from cl_server_shared.models import Base
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
 
-engine = create_db_engine(Config.STORE_DATABASE_URL)
-SessionLocal = create_session_factory(engine)
+# Create engine
+engine = create_engine(
+    Config.STORE_DATABASE_URL,
+    connect_args={"check_same_thread": False}
+)
 
-# Use in FastAPI
-from cl_server_shared import get_db_session
-app.dependency(Depends(lambda: get_db_session(SessionLocal)))
+# Enable WAL mode for concurrent access
+@event.listens_for(engine, "connect")
+def enable_wal_mode(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=10000")
+    cursor.close()
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+# Create session factory
+session_factory = sessionmaker(bind=engine)
+
+# Create repository
+repository = SQLAlchemyJobRepository(session_factory)
 ```
 
-### Adapters for cl_ml_tools
+### SQLAlchemyJobRepository
 
-**SQLAlchemyJobRepository** (adapters.py:32) - Bridges cl_ml_tools JobRepository protocol with SQLAlchemy:
+**Location**: `shared_db.py:37`
+
+Implements `cl_ml_tools.JobRepository` protocol with SQLAlchemy backend:
 - Maps between library Job (7 fields) and database Job (14 fields)
 - Handles JSON serialization, timestamps, retry logic
 - `fetch_next_job()` uses optimistic locking for atomic job claiming
+- MQTT broadcasting integrated via `Config` values
 
-**FileStorageAdapter** (adapters.py:322) - Wraps FileStorageService for cl_ml_tools FileStorage protocol:
+**Key Methods**:
+- `add_job(job, created_by=None, priority=None)` - Add job to database
+- `get_job(job_id)` - Retrieve job by ID
+- `update_job(job_id, **kwargs)` - Update job fields
+- `fetch_next_job(task_types)` - Atomically claim next queued job
+- `delete_job(job_id)` - Delete job
+
+### FileStorageService
+
+**Location**: `file_storage.py:16`
+
+Implements `cl_ml_tools.FileStorage` protocol directly (no separate adapter):
 - Manages job directories with input/output subdirectories
-- Converts relative paths to absolute paths for library compatibility
+- Returns absolute paths (protocol requirement)
+- SHA256 hash calculation for uploaded files
 
-### File Storage Service
-`FileStorageService` manages media files with job-specific directories:
-- `save_file()` - Save uploaded files with UUID naming
-- `create_job_directory()` - Create isolated job workspace
-- `cleanup_job()` - Remove job files on completion/failure
+**Key Methods**:
+- `create_job_directory(job_id)` - Create job workspace
+- `get_input_path(job_id)` - Absolute path to input directory
+- `get_output_path(job_id)` - Absolute path to output directory
+- `save_input_file(job_id, filename, file)` - Save uploaded file (async)
+- `cleanup_job(job_id)` - Delete job directory
 
 ## Environment Variables
 
@@ -208,3 +261,34 @@ Auth-specific:
 - Python 3.9+ compatibility required
 - Ruff for linting: E, F, I, W rules (E501 ignored)
 - Type hints required for public APIs
+
+## Public API
+
+**Import Pattern**:
+```python
+from cl_server_shared import (
+    Config,                     # Configuration singleton
+    FileStorageService,         # File storage (implements cl_ml_tools.FileStorage)
+    Job,                        # Job model
+    QueueEntry,                 # Queue model
+    SQLAlchemyJobRepository,    # Job repository (implements cl_ml_tools.JobRepository)
+)
+```
+
+**What's NOT exported**:
+- Database utilities (services create their own engines/sessions)
+- Base class (import from `cl_server_shared.models`)
+- Protocols (use from `cl_ml_tools` package)
+
+## Testing
+
+Tests are organized by component:
+- `tests/test_config.py` - Configuration tests
+- `tests/test_shared_db.py` - SQLAlchemyJobRepository and model tests
+- `tests/test_file_storage.py` - FileStorageService tests
+
+When writing tests:
+- Create in-memory SQLite databases for repository tests
+- Use temporary directories for file storage tests
+- Mock MQTT broadcaster in repository tests
+- Test protocol compliance (isinstance checks)

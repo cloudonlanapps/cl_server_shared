@@ -2,7 +2,7 @@
 from sqlalchemy import BigInteger, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..database import Base
+from . import Base
 
 class QueueEntry(Base):
     """Priority queue entry for job scheduling.

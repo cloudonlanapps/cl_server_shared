@@ -5,12 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2024-12-05
+## [0.1.0] - 2024-12-11
 
 ### Added
 - Initial release
-- `Config` class for unified configuration management
-- Database utilities with SQLite WAL mode support
-- `Job` and `QueueEntry` models
-- `FileStorageService` for media file management
-- adapters !

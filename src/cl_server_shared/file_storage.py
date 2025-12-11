@@ -11,6 +11,7 @@ from typing import Optional
 
 from fastapi import UploadFile
 
+from cl_ml_tools import FileStorage
 
 class FileStorageService:
     """Service for managing file storage with organized directory structure."""
@@ -23,9 +24,9 @@ class FileStorageService:
             base_dir: Base directory for file storage. If None, uses MEDIA_STORAGE_DIR from config.
         """
         if base_dir is None:
-            from .config import MEDIA_STORAGE_DIR
+            from .config import Config
 
-            base_dir = MEDIA_STORAGE_DIR
+            base_dir = Config.MEDIA_STORAGE_DIR
 
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
@@ -229,7 +230,7 @@ class FileStorageService:
 
         return {
             "filename": filename,
-            "path": str(file_path.relative_to(self.base_dir)),
+            "path": str(file_path),
             "size": file_size,
             "hash": file_hash,
         }
