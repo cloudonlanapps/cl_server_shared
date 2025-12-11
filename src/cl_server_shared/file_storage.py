@@ -13,7 +13,8 @@ from fastapi import UploadFile
 
 from cl_ml_tools import FileStorage
 
-class FileStorageService:
+
+class FileStorageService(FileStorage):
     """Service for managing file storage with organized directory structure."""
 
     def __init__(self, base_dir: Optional[str] = None):
