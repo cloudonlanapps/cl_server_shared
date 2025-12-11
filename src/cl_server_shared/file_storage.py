@@ -152,20 +152,19 @@ class FileStorageService:
 
     # Job file management functions (from compute service, decoupled from endpoints)
 
-    def create_job_directory(self, job_id: str) -> Path:
+    def create_job_directory(self, job_id: str) -> None:
         """Create job-specific directory structure.
 
         Args:
             job_id: Unique job identifier
 
         Returns:
-            Path to the job directory
+            None
         """
         job_dir = self.base_dir / "jobs" / job_id
         job_dir.mkdir(parents=True, exist_ok=True)
         (job_dir / "input").mkdir(exist_ok=True)
         (job_dir / "output").mkdir(exist_ok=True)
-        return job_dir
 
     def get_job_path(self, job_id: str) -> Path:
         """Get the job directory path.
@@ -179,24 +178,24 @@ class FileStorageService:
         return self.base_dir / "jobs" / job_id
 
     def get_input_path(self, job_id: str) -> Path:
-        """Get the input directory path for a job.
+        """Get the absolute input directory path for a job.
 
         Args:
             job_id: Unique job identifier
 
         Returns:
-            Path to the input directory
+            Absolute Path to the input directory
         """
         return self.base_dir / "jobs" / job_id / "input"
 
     def get_output_path(self, job_id: str) -> Path:
-        """Get the output directory path for a job.
+        """Get the absolute output directory path for a job.
 
         Args:
             job_id: Unique job identifier
 
         Returns:
-            Path to the output directory
+            Absolute Path to the output directory
         """
         return self.base_dir / "jobs" / job_id / "output"
 
@@ -214,10 +213,17 @@ class FileStorageService:
             file: Uploaded file object
 
         Returns:
-            Dictionary with file information
+            Dictionary with file information:
+            - filename: Original filename
+            - path: Relative path from input directory (use get_input_path() to get absolute path)
+            - size: File size in bytes
+            - hash: SHA256 hash of file contents
         """
         input_dir = self.get_input_path(job_id)
         file_path = input_dir / filename
+
+        # Create parent directory if it doesn't exist (for filenames with subdirectories)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write file in chunks
         with open(file_path, "wb") as f:
@@ -228,9 +234,12 @@ class FileStorageService:
         file_size = file_path.stat().st_size
         file_hash = self._calculate_hash(file_path)
 
+        # Return relative path from input directory (not absolute)
+        relative_path = file_path.relative_to(input_dir)
+
         return {
             "filename": filename,
-            "path": str(file_path),
+            "path": str(relative_path),
             "size": file_size,
             "hash": file_hash,
         }
@@ -249,7 +258,7 @@ class FileStorageService:
             link_name: Name for the link (defaults to basename of external_path)
 
         Returns:
-            Relative path to the symlink
+            Relative path from input directory (use get_input_path() to get absolute path)
         """
         input_dir = self.get_input_path(job_id)
 
@@ -266,7 +275,8 @@ class FileStorageService:
         # Create symlink
         os.symlink(external_path, link_path)
 
-        return str(link_path.relative_to(self.base_dir))
+        # Return relative path from input directory (not base_dir)
+        return str(link_path.relative_to(input_dir))
 
     def cleanup_job(self, job_id: str) -> bool:
         """Delete entire job directory and all its files.

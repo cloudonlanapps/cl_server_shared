@@ -168,14 +168,19 @@ if next_job:
 Implements `cl_ml_tools.FileStorage` protocol for job file management.
 
 **Key Methods:**
-- `create_job_directory(job_id)` - Create job directory with input/output subdirectories
+- `create_job_directory(job_id)` - Create job directory with input/output subdirectories (returns None)
 - `get_input_path(job_id)` - Get absolute path to input directory
 - `get_output_path(job_id)` - Get absolute path to output directory
-- `save_input_file(job_id, filename, file)` - Save uploaded file (async)
+- `get_absolute_path(relative_path)` - Convert relative path to absolute path
+- `save_input_file(job_id, filename, file)` - Save uploaded file (async, returns relative path)
 - `cleanup_job(job_id)` - Delete job directory and all files
 
+**Path Handling:**
+- **Absolute paths returned by:** `get_input_path()`, `get_output_path()`, `get_absolute_path()`
+- **Relative paths returned by:** `save_input_file()` (relative to input directory)
+- Users must combine relative paths with `get_input_path()` to get absolute paths
+
 **Features:**
-- Returns absolute paths (protocol compliant)
 - SHA256 hash calculation for uploaded files
 - Organized media storage: `store/YYYY/MM/DD/{md5}.{ext}`
 - Isolated job workspaces: `jobs/{job_id}/input/` and `jobs/{job_id}/output/`
@@ -189,17 +194,23 @@ file_storage = FileStorageService("/path/to/media")
 
 # Create job workspace
 job_id = "job-123"
-job_dir = file_storage.create_job_directory(job_id)
+file_storage.create_job_directory(job_id)
 
 # Save uploaded file
 async def upload_handler(file: UploadFile):
     result = await file_storage.save_input_file(job_id, file.filename, file)
-    # Returns: {"filename": "...", "path": "/abs/path", "size": 1234, "hash": "..."}
+    # Returns: {"filename": "test.txt", "path": "test.txt", "size": 1234, "hash": "..."}
+    # path is relative to input directory
+
+    # To get absolute path:
+    input_path = file_storage.get_input_path(job_id)
+    absolute_path = input_path / result["path"]
+
     return result
 
-# Get paths
-input_path = file_storage.get_input_path(job_id)
-output_path = file_storage.get_output_path(job_id)
+# Get absolute paths
+input_path = file_storage.get_input_path(job_id)  # Absolute
+output_path = file_storage.get_output_path(job_id)  # Absolute
 
 # Cleanup
 file_storage.cleanup_job(job_id)

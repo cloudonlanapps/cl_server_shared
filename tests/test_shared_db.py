@@ -266,7 +266,7 @@ class TestSQLAlchemyJobRepositoryBroadcasting:
 
         return mock_session_factory
 
-    @patch("cl_ml_tools.get_broadcaster")
+    @patch("cl_server_shared.shared_db.get_broadcaster")
     def test_broadcaster_initialized(self, mock_get_broadcaster):
         """Test that broadcaster is initialized in __init__."""
         mock_broadcaster = Mock()
@@ -278,7 +278,7 @@ class TestSQLAlchemyJobRepositoryBroadcasting:
         assert hasattr(repository, "broadcaster")
         assert repository.broadcaster is not None
 
-    @patch("cl_ml_tools.get_broadcaster")
+    @patch("cl_server_shared.shared_db.get_broadcaster")
     def test_update_job_broadcasts_progress(self, mock_get_broadcaster):
         """Test that update_job broadcasts progress when progress is updated."""
         mock_broadcaster = Mock()
@@ -303,10 +303,10 @@ class TestSQLAlchemyJobRepositoryBroadcasting:
         # Parse payload
         payload = json.loads(call_args.kwargs["payload"])
         assert payload["job_id"] == "test-job-id"
-        assert payload["status"] == "processing"
+        assert payload["event_type"] == "processing"
         assert payload["progress"] == 50
 
-    @patch("cl_ml_tools.get_broadcaster")
+    @patch("cl_server_shared.shared_db.get_broadcaster")
     def test_update_job_different_status(self, mock_get_broadcaster):
         """Test broadcasting with different job statuses."""
         mock_broadcaster = Mock()
@@ -324,7 +324,7 @@ class TestSQLAlchemyJobRepositoryBroadcasting:
         call_args = mock_broadcaster.publish_event.call_args
         payload = json.loads(call_args.kwargs["payload"])
 
-        assert payload["status"] == "completed"
+        assert payload["event_type"] == "completed"
         assert payload["progress"] == 100
 
 

@@ -41,12 +41,16 @@ class TestFileStorageService:
         """Test creating job directory structure."""
         job_id = str(uuid4())
 
-        job_dir = file_storage.create_job_directory(job_id)
+        file_storage.create_job_directory(job_id)
 
-        assert job_dir.exists()
-        assert job_dir.is_dir()
-        assert (job_dir / "input").exists()
-        assert (job_dir / "output").exists()
+        # Verify directories were created using get_input_path and get_output_path
+        input_path = file_storage.get_input_path(job_id)
+        output_path = file_storage.get_output_path(job_id)
+
+        assert input_path.exists()
+        assert output_path.exists()
+        assert input_path.is_dir()
+        assert output_path.is_dir()
 
     def test_get_input_path(self, file_storage):
         """Test getting input directory path."""
@@ -92,13 +96,14 @@ class TestFileStorageService:
         assert result["size"] == len(file_content)
         assert "hash" in result
 
-        # Verify path is absolute (protocol requirement)
-        path = Path(result["path"])
-        assert path.is_absolute()
+        # Verify path is relative (from input directory)
+        assert result["path"] == "test.txt"
 
-        # Verify file exists and has correct content
-        assert path.exists()
-        assert path.read_bytes() == file_content
+        # Construct absolute path using get_input_path and verify file exists
+        input_dir = file_storage.get_input_path(job_id)
+        absolute_path = input_dir / result["path"]
+        assert absolute_path.exists()
+        assert absolute_path.read_bytes() == file_content
 
     @pytest.mark.asyncio
     async def test_save_input_file_creates_hash(self, file_storage):
@@ -165,14 +170,14 @@ class TestFileStorageService:
         file2 = UploadFile(filename="file2.txt", file=BytesIO(b"Content 2"))
         result2 = await file_storage.save_input_file(job_id, "file2.txt", file2)
 
-        # Both files should exist
-        assert Path(result1["path"]).exists()
-        assert Path(result2["path"]).exists()
+        # Both paths should be relative
+        assert result1["path"] == "file1.txt"
+        assert result2["path"] == "file2.txt"
 
-        # Files should be in the same input directory
+        # Both files should exist when combined with input_path
         input_path = file_storage.get_input_path(job_id)
-        assert Path(result1["path"]).parent == input_path
-        assert Path(result2["path"]).parent == input_path
+        assert (input_path / result1["path"]).exists()
+        assert (input_path / result2["path"]).exists()
 
     def test_get_absolute_path(self, file_storage):
         """Test converting relative path to absolute."""
@@ -194,6 +199,10 @@ class TestFileStorageService:
 
         result = await file_storage.save_input_file(job_id, "subdir/test.txt", file)
 
-        # File should be saved successfully
-        assert Path(result["path"]).exists()
-        assert Path(result["path"]).read_bytes() == file_content
+        # Path should be relative with subdirectory
+        assert result["path"] == "subdir/test.txt"
+
+        # File should be saved successfully when combined with input_path
+        input_path = file_storage.get_input_path(job_id)
+        assert (input_path / result["path"]).exists()
+        assert (input_path / result["path"]).read_bytes() == file_content
