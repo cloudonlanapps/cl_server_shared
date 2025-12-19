@@ -35,7 +35,7 @@ from .job_translator import db_job_to_job_record
 from .models import Job, QueueEntry
 
 
-class JobRepository(JobRepository):
+class JobRepositoryService(JobRepository):
     """SQLAlchemy implementation of JobRepository protocol.
 
     This adapter bridges the cl_ml_tools JobRepository protocol with
