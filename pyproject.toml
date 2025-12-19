@@ -84,6 +84,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+test_storage_base_dir = "/tmp/cl_server_test"
 
 [tool.ruff]
 line-length = 100
