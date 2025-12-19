@@ -1,7 +1,3 @@
-[build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "cl-server-shared"
 version = "0.1.0"
@@ -10,10 +6,10 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
 authors = [
-    {name = "CL Server Team"}
+    {name = "Ananda Sarangaram"}
 ]
 maintainers = [
-    {name = "CL Server Team"}
+    {name = "Ananda Sarangaram"}
 ]
 keywords = [
     "server",
@@ -44,25 +40,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-fastapi = [
-    "fastapi>=0.100.0",
-    "python-multipart>=0.0.6",
-]
-compute = [
-    "Pillow>=10.0.0",
-]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
     "basedpyright>=1.36.0",
-]
-# 'all' extra combines the main optional groups
-all = [
-    "fastapi>=0.100.0",
-    "python-multipart>=0.0.6",
-    "Pillow>=10.0.0",
 ]
 
 [project.urls]
