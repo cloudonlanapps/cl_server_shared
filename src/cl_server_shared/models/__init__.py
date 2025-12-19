@@ -1,15 +1,7 @@
 """Shared database models."""
 
-from sqlalchemy.orm import DeclarativeBase
-
-
-class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy models."""
-
-    pass
-
-
-from .job import Job
+from .base import Base
+from .job import Job  # noqa: E402
 from .queue import QueueEntry
 
 __all__ = ["Base", "Job", "QueueEntry"]

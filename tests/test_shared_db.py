@@ -5,8 +5,7 @@ Tests repository operations, MQTT broadcasting, and integration workflows.
 
 import json
 import time
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -14,9 +13,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from cl_ml_tools import Job as LibraryJob
-from cl_server_shared import Job as DatabaseJob, SQLAlchemyJobRepository
+from cl_ml_tools.common.schema_job_record import JobRecord, JobRecordUpdate, JobStatus
+
+from cl_server_shared import SQLAlchemyJobRepository
 from cl_server_shared.models import Base
+from cl_server_shared.models import Job as DatabaseJob
 
 
 # ============================================================================
@@ -51,56 +52,56 @@ def repository(session_factory):
 
 
 @pytest.fixture
-def sample_library_job():
-    """Create sample library Job for testing."""
-    return LibraryJob(
+def sample_job_record():
+    """Create sample JobRecord for testing."""
+    return JobRecord(
         job_id=str(uuid4()),
         task_type="image_resize",
         params={
-            "input_paths": ["/tmp/input.jpg"],
-            "output_paths": ["/tmp/output.jpg"],
+            "input_path": "/tmp/input.jpg",
+            "output_path": "/tmp/output.jpg",
             "width": 800,
             "height": 600,
         },
-        status="queued",
+        status=JobStatus.queued,
         progress=0,
     )
 
 
 # ============================================================================
-# SQL AlchemyJobRepository Tests
+# SQLAlchemyJobRepository Tests
 # ============================================================================
 
 
 class TestSQLAlchemyJobRepository:
     """Test suite for SQLAlchemyJobRepository."""
 
-    def test_add_job(self, repository, sample_library_job):
+    def test_add_job(self, repository, sample_job_record):
         """Test adding a job to the database."""
-        job_id = repository.add_job(
-            sample_library_job, created_by="test_user", priority=5
+        success = repository.add_job(
+            sample_job_record, created_by="test_user", priority=5
         )
 
-        assert job_id == sample_library_job.job_id
+        assert success is True
 
         # Verify job was saved
-        retrieved_job = repository.get_job(job_id)
+        retrieved_job = repository.get_job(sample_job_record.job_id)
         assert retrieved_job is not None
-        assert retrieved_job.job_id == sample_library_job.job_id
-        assert retrieved_job.task_type == sample_library_job.task_type
-        assert retrieved_job.status == "queued"
+        assert retrieved_job.job_id == sample_job_record.job_id
+        assert retrieved_job.task_type == sample_job_record.task_type
+        assert retrieved_job.status == JobStatus.queued
 
     def test_add_job_with_database_fields(
-        self, repository, session_factory, sample_library_job
+        self, repository, session_factory, sample_job_record
     ):
         """Test that add_job adds database-specific fields correctly."""
-        repository.add_job(sample_library_job, created_by="user123")
+        repository.add_job(sample_job_record, created_by="user123")
 
         # Check database directly
         with session_factory() as session:
             db_job = (
                 session.query(DatabaseJob)
-                .filter_by(job_id=sample_library_job.job_id)
+                .filter_by(job_id=sample_job_record.job_id)
                 .first()
             )
 
@@ -111,80 +112,86 @@ class TestSQLAlchemyJobRepository:
             assert db_job.retry_count == 0
             assert db_job.max_retries == 3
 
-    def test_add_job_serializes_params(
-        self, repository, session_factory, sample_library_job
+    def test_add_job_stores_params_as_dict(
+        self, repository, session_factory, sample_job_record
     ):
-        """Test that params dict is serialized to JSON string."""
-        repository.add_job(sample_library_job)
+        """Test that params dict is stored as JSON/dict (not string)."""
+        repository.add_job(sample_job_record)
 
         with session_factory() as session:
             db_job = (
                 session.query(DatabaseJob)
-                .filter_by(job_id=sample_library_job.job_id)
+                .filter_by(job_id=sample_job_record.job_id)
                 .first()
             )
 
-            # params should be JSON string in database
-            assert isinstance(db_job.params, str)
-            params = json.loads(db_job.params)
-            assert params == sample_library_job.params
+            # params should be dict in database (JSON column type)
+            assert isinstance(db_job.params, dict)
+            assert db_job.params == sample_job_record.params
 
-    def test_get_job(self, repository, sample_library_job):
+    def test_get_job(self, repository, sample_job_record):
         """Test retrieving a job by ID."""
-        repository.add_job(sample_library_job)
-        retrieved_job = repository.get_job(sample_library_job.job_id)
+        repository.add_job(sample_job_record)
+        retrieved_job = repository.get_job(sample_job_record.job_id)
 
         assert retrieved_job is not None
-        assert retrieved_job.job_id == sample_library_job.job_id
+        assert retrieved_job.job_id == sample_job_record.job_id
         assert isinstance(retrieved_job.params, dict)
+        assert isinstance(retrieved_job, JobRecord)
 
     def test_get_job_nonexistent(self, repository):
         """Test getting a job that doesn't exist returns None."""
         result = repository.get_job("nonexistent-job-id")
         assert result is None
 
-    def test_update_job_status(self, repository, sample_library_job):
+    def test_update_job_status(self, repository, sample_job_record):
         """Test updating job status."""
-        repository.add_job(sample_library_job)
-        success = repository.update_job(sample_library_job.job_id, status="processing")
+        repository.add_job(sample_job_record)
+
+        update = JobRecordUpdate(status=JobStatus.processing)
+        success = repository.update_job(sample_job_record.job_id, update)
 
         assert success is True
-        updated_job = repository.get_job(sample_library_job.job_id)
-        assert updated_job.status == "processing"
+        updated_job = repository.get_job(sample_job_record.job_id)
+        assert updated_job.status == JobStatus.processing
 
-    def test_update_job_progress(self, repository, sample_library_job):
+    def test_update_job_progress(self, repository, sample_job_record):
         """Test updating job progress."""
-        repository.add_job(sample_library_job)
-        repository.update_job(sample_library_job.job_id, progress=50)
+        repository.add_job(sample_job_record)
 
-        updated_job = repository.get_job(sample_library_job.job_id)
+        update = JobRecordUpdate(progress=50)
+        repository.update_job(sample_job_record.job_id, update)
+
+        updated_job = repository.get_job(sample_job_record.job_id)
         assert updated_job.progress == 50
 
     def test_update_job_sets_timestamps(
-        self, repository, session_factory, sample_library_job
+        self, repository, session_factory, sample_job_record
     ):
         """Test that status changes set appropriate timestamps."""
-        repository.add_job(sample_library_job)
+        repository.add_job(sample_job_record)
 
         # Update to processing should set started_at
-        repository.update_job(sample_library_job.job_id, status="processing")
+        update = JobRecordUpdate(status=JobStatus.processing)
+        repository.update_job(sample_job_record.job_id, update)
 
         with session_factory() as session:
             db_job = (
                 session.query(DatabaseJob)
-                .filter_by(job_id=sample_library_job.job_id)
+                .filter_by(job_id=sample_job_record.job_id)
                 .first()
             )
             assert db_job.started_at is not None
             assert db_job.completed_at is None
 
         # Update to completed should set completed_at
-        repository.update_job(sample_library_job.job_id, status="completed")
+        update = JobRecordUpdate(status=JobStatus.completed)
+        repository.update_job(sample_job_record.job_id, update)
 
         with session_factory() as session:
             db_job = (
                 session.query(DatabaseJob)
-                .filter_by(job_id=sample_library_job.job_id)
+                .filter_by(job_id=sample_job_record.job_id)
                 .first()
             )
             assert db_job.completed_at is not None
@@ -192,11 +199,19 @@ class TestSQLAlchemyJobRepository:
     def test_fetch_next_job(self, repository):
         """Test fetching next queued job."""
         # Add multiple jobs
-        job1 = LibraryJob(
-            job_id=str(uuid4()), task_type="image_resize", params={}, status="queued"
+        job1 = JobRecord(
+            job_id=str(uuid4()),
+            task_type="image_resize",
+            params={"input_path": "test.jpg", "output_path": "out.jpg"},
+            status=JobStatus.queued,
+            progress=0,
         )
-        job2 = LibraryJob(
-            job_id=str(uuid4()), task_type="image_conversion", params={}, status="queued"
+        job2 = JobRecord(
+            job_id=str(uuid4()),
+            task_type="image_conversion",
+            params={"input_path": "test.jpg", "output_path": "out.png"},
+            status=JobStatus.queued,
+            progress=0,
         )
 
         repository.add_job(job1)
@@ -208,12 +223,16 @@ class TestSQLAlchemyJobRepository:
 
         assert fetched_job is not None
         assert fetched_job.job_id == job1.job_id
-        assert fetched_job.status == "processing"
+        assert fetched_job.status == JobStatus.processing
 
     def test_fetch_next_job_atomic(self, repository):
         """Test that fetch_next_job is atomic (only one worker gets the job)."""
-        job = LibraryJob(
-            job_id=str(uuid4()), task_type="test", params={}, status="queued"
+        job = JobRecord(
+            job_id=str(uuid4()),
+            task_type="test",
+            params={"input_path": "test.jpg", "output_path": "out.jpg"},
+            status=JobStatus.queued,
+            progress=0,
         )
         repository.add_job(job)
 
@@ -225,13 +244,13 @@ class TestSQLAlchemyJobRepository:
         fetched2 = repository.fetch_next_job(["test"])
         assert fetched2 is None
 
-    def test_delete_job(self, repository, sample_library_job):
+    def test_delete_job(self, repository, sample_job_record):
         """Test deleting a job."""
-        repository.add_job(sample_library_job)
-        result = repository.delete_job(sample_library_job.job_id)
+        repository.add_job(sample_job_record)
+        result = repository.delete_job(sample_job_record.job_id)
 
         assert result is True
-        assert repository.get_job(sample_library_job.job_id) is None
+        assert repository.get_job(sample_job_record.job_id) is None
 
     def test_delete_job_nonexistent(self, repository):
         """Test deleting a nonexistent job returns False."""
@@ -289,8 +308,9 @@ class TestSQLAlchemyJobRepositoryBroadcasting:
         mock_session_factory = self._create_mock_session_factory()
         repository = SQLAlchemyJobRepository(mock_session_factory)
 
-        # Update job progress
-        repository.update_job("test-job-id", progress=50)
+        # Update job progress using JobRecordUpdate
+        update = JobRecordUpdate(progress=50)
+        repository.update_job("test-job-id", update)
 
         # Verify broadcast was called
         mock_broadcaster.publish_event.assert_called_once()
@@ -316,8 +336,9 @@ class TestSQLAlchemyJobRepositoryBroadcasting:
         mock_session_factory = self._create_mock_session_factory()
         repository = SQLAlchemyJobRepository(mock_session_factory)
 
-        # Update to completed
-        repository.update_job("test-job-id", status="completed", progress=100)
+        # Update to completed using JobRecordUpdate
+        update = JobRecordUpdate(status=JobStatus.completed, progress=100)
+        repository.update_job("test-job-id", update)
 
         # Verify broadcast
         assert mock_broadcaster.publish_event.called
@@ -340,30 +361,38 @@ class TestIntegration:
     async def test_full_job_workflow(self, repository):
         """Test complete job workflow."""
         # Create job
-        job = LibraryJob(
+        job = JobRecord(
             job_id=str(uuid4()),
             task_type="image_resize",
-            params={"width": 100, "height": 100},
-            status="queued",
+            params={
+                "input_path": "/tmp/input.jpg",
+                "output_path": "/tmp/output.jpg",
+                "width": 100,
+                "height": 100,
+            },
+            status=JobStatus.queued,
+            progress=0,
         )
         repository.add_job(job, created_by="test_user")
 
         # Fetch job (simulating worker)
         fetched_job = repository.fetch_next_job(["image_resize"])
         assert fetched_job is not None
-        assert fetched_job.status == "processing"
+        assert fetched_job.status == JobStatus.processing
 
         # Update progress
-        repository.update_job(job.job_id, progress=50)
+        update = JobRecordUpdate(progress=50)
+        repository.update_job(job.job_id, update)
 
         # Mark complete with output
         task_output = {"processed_files": ["/path/to/output.jpg"]}
-        repository.update_job(
-            job.job_id, status="completed", progress=100, task_output=task_output
+        update = JobRecordUpdate(
+            status=JobStatus.completed, progress=100, output=task_output
         )
+        repository.update_job(job.job_id, update)
 
         # Verify final state
         final_job = repository.get_job(job.job_id)
-        assert final_job.status == "completed"
+        assert final_job.status == JobStatus.completed
         assert final_job.progress == 100
-        assert final_job.task_output["processed_files"] == ["/path/to/output.jpg"]
+        assert final_job.output["processed_files"] == ["/path/to/output.jpg"]

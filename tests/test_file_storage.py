@@ -150,11 +150,11 @@ class TestFileStorageService:
         assert "jobs" in str(job_path)
 
     def test_file_storage_implements_protocol(self, file_storage):
-        """Test that FileStorageService implements cl_ml_tools.FileStorage protocol."""
-        from cl_ml_tools import FileStorage
+        """Test that FileStorageService implements cl_ml_tools.JobStorage protocol."""
+        from cl_ml_tools import JobStorage
 
         # Should be instance of protocol
-        assert isinstance(file_storage, FileStorage)
+        assert isinstance(file_storage, JobStorage)
 
     @pytest.mark.asyncio
     async def test_multiple_files_same_job(self, file_storage):

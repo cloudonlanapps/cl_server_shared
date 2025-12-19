@@ -9,8 +9,6 @@ Usage:
 """
 
 import os
-from pathlib import Path
-from typing import List, Optional
 
 
 class Config:
@@ -67,7 +65,7 @@ class Config:
         return os.getenv(key, str(default)).lower() in ("true", "1", "yes")
 
     @staticmethod
-    def _get_list(key: str, default: str, separator: str = ",") -> List[str]:
+    def _get_list(key: str, default: str, separator: str = ",") -> list[str]:
         """Get list configuration value."""
         return os.getenv(key, default).split(separator)
 
@@ -82,9 +80,7 @@ class Config:
     # ========================================================================
 
     # Auth service uses separate database
-    AUTH_DATABASE_URL: str = _get_value(
-        "DATABASE_URL", f"sqlite:///{CL_SERVER_DIR}/user_auth.db"
-    )
+    AUTH_DATABASE_URL: str = _get_value("DATABASE_URL", f"sqlite:///{CL_SERVER_DIR}/user_auth.db")
 
     # Store service and worker share the same database
     STORE_DATABASE_URL: str = _get_value(
@@ -99,16 +95,10 @@ class Config:
     # Auth Service Configuration
     # ========================================================================
 
-    PRIVATE_KEY_PATH: str = _get_value(
-        "PRIVATE_KEY_PATH", f"{CL_SERVER_DIR}/private_key.pem"
-    )
-    PUBLIC_KEY_PATH: str = _get_value(
-        "PUBLIC_KEY_PATH", f"{CL_SERVER_DIR}/public_key.pem"
-    )
+    PRIVATE_KEY_PATH: str = _get_value("PRIVATE_KEY_PATH", f"{CL_SERVER_DIR}/private_key.pem")
+    PUBLIC_KEY_PATH: str = _get_value("PUBLIC_KEY_PATH", f"{CL_SERVER_DIR}/public_key.pem")
     ALGORITHM: str = "ES256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = _get_int(
-        "ACCESS_TOKEN_EXPIRE_MINUTES", 30
-    )
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = _get_int("ACCESS_TOKEN_EXPIRE_MINUTES", 30)
     ADMIN_USERNAME: str = _get_value("ADMIN_USERNAME", "admin")
     ADMIN_PASSWORD: str = _get_value("ADMIN_PASSWORD", "admin")
 
@@ -116,12 +106,8 @@ class Config:
     # Store Service Configuration
     # ========================================================================
 
-    MEDIA_STORAGE_DIR: str = _get_value(
-        "MEDIA_STORAGE_DIR", f"{CL_SERVER_DIR}/media"
-    )
-    COMPUTE_STORAGE_DIR: str = _get_value(
-        "COMPUTE_STORAGE_DIR", f"{CL_SERVER_DIR}/compute"
-    )
+    MEDIA_STORAGE_DIR: str = _get_value("MEDIA_STORAGE_DIR", f"{CL_SERVER_DIR}/media")
+    COMPUTE_STORAGE_DIR: str = _get_value("COMPUTE_STORAGE_DIR", f"{CL_SERVER_DIR}/compute")
     AUTH_DISABLED: bool = _get_bool("AUTH_DISABLED", False)
     READ_AUTH_ENABLED: bool = _get_bool("READ_AUTH_ENABLED", False)
 
@@ -133,7 +119,7 @@ class Config:
 
     # Worker-specific
     WORKER_ID: str = _get_value("WORKER_ID", "worker-default")
-    WORKER_SUPPORTED_TASKS: List[str] = _get_list(
+    WORKER_SUPPORTED_TASKS: list[str] = _get_list(
         "WORKER_SUPPORTED_TASKS", "image_resize,image_conversion"
     )
     WORKER_POLL_INTERVAL: int = _get_int("WORKER_POLL_INTERVAL", 5)
@@ -147,9 +133,5 @@ class Config:
     MQTT_PORT: int = _get_int("MQTT_PORT", 1883)
     MQTT_TOPIC: str = _get_value("MQTT_TOPIC", "inference/events")
     MQTT_HEARTBEAT_INTERVAL: int = _get_int("MQTT_HEARTBEAT_INTERVAL", 30)
-    CAPABILITY_TOPIC_PREFIX: str = _get_value(
-        "CAPABILITY_TOPIC_PREFIX", "inference/workers"
-    )
+    CAPABILITY_TOPIC_PREFIX: str = _get_value("CAPABILITY_TOPIC_PREFIX", "inference/workers")
     CAPABILITY_CACHE_TIMEOUT: int = _get_int("CAPABILITY_CACHE_TIMEOUT", 10)
-
-
