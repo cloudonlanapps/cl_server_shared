@@ -10,7 +10,7 @@ import aiofiles
 from cl_ml_tools import AsyncFileLike, FileLike, JobStorage, SavedJobFile
 
 
-class JobStorageService(JobStorage):
+class JobStore(JobStorage):
     """Service for managing file storage with organized directory structure."""
 
     _CHUNK_SIZE: Final[int] = 1024 * 1024  # 1 MB
