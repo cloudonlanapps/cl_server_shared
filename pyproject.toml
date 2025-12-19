@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cl-server-shared"
 version = "0.1.0"
-description = "Shared utilities for CL Server services - database, file storage,  and compute modules"
+description = "Shared utilities for CL Server services"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
@@ -90,7 +90,7 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W"]
+select = ["E", "F", "I", "W", "F811", "F401"]
 ignore = ["E501"]
 
 [tool.coverage.run]
@@ -102,4 +102,8 @@ exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
+]
+[tool.basedpyright]
+exclude = [
+  "utils/**",
 ]

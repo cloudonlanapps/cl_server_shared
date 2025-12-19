@@ -2,5 +2,5 @@
   "venvPath": ".",
   "venv": ".venv",
   "reportMissingTypeStubs": true,
-  "ignore": [],
+  "ignore": ["utils/**"],
 }

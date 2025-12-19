@@ -2,7 +2,7 @@
 
 This module provides adapter classes that bridge the cl_ml_tools library
 protocols (JobRepository and JobStorage) with the application's actual
-implementations (SQLAlchemy database and FileStorageService).
+implementations (SQLAlchemy database).
 
 The adapters handle:
 - Mapping between library JobRecord (Pydantic) and database Job model (SQLAlchemy)
@@ -16,14 +16,22 @@ from collections.abc import Sequence
 from typing import override
 
 # Library protocols and schemas (Pydantic models)
-from cl_ml_tools import JobRepository, MQTTBroadcaster, NoOpBroadcaster, get_broadcaster
-from cl_ml_tools.common.schema_job_record import JobRecord, JobRecordUpdate, JobStatus
+from cl_ml_tools import (
+    JobRecord,
+    JobRecordUpdate,
+    JobRepository,
+    JobStatus,
+    MQTTBroadcaster,
+    NoOpBroadcaster,
+    get_broadcaster,
+)
 from pydantic import JsonValue
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 # Application models (SQLAlchemy)
 from .config import Config
+from .job_translator import db_job_to_job_record
 from .models import Job, QueueEntry
 
 
@@ -72,6 +80,26 @@ class SQLAlchemyJobRepository(JobRepository):
             port=Config.MQTT_PORT,
         )
 
+    def _broadcast_progress(self, job_id: str, status: JobStatus, progress: int) -> None:
+        """Broadcast job progress update via MQTT.
+
+        Args:
+            job_id: Unique job identifier
+            status: Current job status
+            progress: Progress percentage (0-100)
+        """
+        payload = {
+            "job_id": job_id,
+            "event_type": status.value,
+            "timestamp": int(time.time() * 1000),
+            "progress": progress,
+        }
+
+        if self.broadcaster:
+            import json
+
+            _ = self.broadcaster.publish_event(topic=Config.MQTT_TOPIC, payload=json.dumps(payload))
+
     @override
     def add_job(
         self,
@@ -105,7 +133,7 @@ class SQLAlchemyJobRepository(JobRepository):
                 status=job.status.value,  # Convert enum to string
                 progress=job.progress,
                 created_at=int(time.time() * 1000),  # Current timestamp in milliseconds
-                task_output=job.output,  # Pydantic model_dump() if present
+                output=job.output,  # Pydantic model_dump() if present
                 error_message=job.error_message,
                 priority=priority if priority is not None else 0,
                 retry_count=0,
@@ -115,6 +143,8 @@ class SQLAlchemyJobRepository(JobRepository):
 
             session.add(db_job)
             session.commit()
+
+            self._broadcast_progress(db_job.job_id, JobStatus(db_job.status), db_job.progress)
 
             return True
 
@@ -133,7 +163,7 @@ class SQLAlchemyJobRepository(JobRepository):
             db_job = session.execute(stmt).scalar_one_or_none()
 
             if db_job:
-                return db_job.to_job_record()
+                return db_job_to_job_record(db_job)
             return None
 
     @override
@@ -199,26 +229,6 @@ class SQLAlchemyJobRepository(JobRepository):
 
             return updated_job_id is not None
 
-    def _broadcast_progress(self, job_id: str, status: JobStatus, progress: int) -> None:
-        """Broadcast job progress update via MQTT.
-
-        Args:
-            job_id: Unique job identifier
-            status: Current job status
-            progress: Progress percentage (0-100)
-        """
-        payload = {
-            "job_id": job_id,
-            "event_type": status.value,
-            "timestamp": int(time.time() * 1000),
-            "progress": progress,
-        }
-
-        if self.broadcaster:
-            import json
-
-            _ = self.broadcaster.publish_event(topic=Config.MQTT_TOPIC, payload=json.dumps(payload))
-
     @override
     def fetch_next_job(self, task_types: Sequence[str]) -> JobRecord | None:
         """Atomically find and claim the next queued job.
@@ -269,21 +279,21 @@ class SQLAlchemyJobRepository(JobRepository):
                     Job.status == "queued",  # Optimistic lock
                 )
                 .values(status="processing", started_at=current_time)
-                .returning(Job.job_id)
+                .returning(Job)
             )
 
-            updated_job_id: str | None = session.execute(stmt).scalar_one_or_none()
+            db_job: Job | None = session.execute(stmt).scalar_one_or_none()
             session.commit()
 
             # Check if we successfully claimed the job
-            if updated_job_id is None:
+            if db_job is None:
                 # Another worker claimed it first
                 return None
 
             # Refresh the job object to get updated values
             session.refresh(db_job)
-
-            return db_job.to_job_record()
+            self._broadcast_progress(db_job.job_id, JobStatus(db_job.status), db_job.progress)
+            return db_job_to_job_record(db_job)
 
     @override
     def delete_job(self, job_id: str) -> bool:

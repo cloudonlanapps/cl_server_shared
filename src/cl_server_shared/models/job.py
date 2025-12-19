@@ -1,19 +1,20 @@
 """Job model shared between store service and compute worker."""
 
-from typing import TYPE_CHECKING, TypeAlias, override
+from typing import TypeAlias, override
 
 from sqlalchemy import BigInteger, Integer, String, Text
+from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
 from .base import Base
 
-if TYPE_CHECKING:
-    from cl_ml_tools.common.schema_job_record import JobRecord
-
-# TODO: Move this to cl_ml_tools.common.schema_job_record
+# for ORM we don't use it from Pytentic, hence define JSONObject here
+#
 JSONPrimitive: TypeAlias = str | int | float | bool | None
 JSONValue: TypeAlias = JSONPrimitive | list["JSONValue"] | dict[str, "JSONValue"]
+
+JSONObject: TypeAlias = dict[str, JSONValue]
 
 
 class Job(Base):
@@ -40,9 +41,17 @@ class Job(Base):
     task_type: Mapped[str] = mapped_column(String, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # JSON fields for params and task_output (dict, not string)
-    params: Mapped[JSONValue] = mapped_column(JSON, nullable=False, default=dict)
-    output: Mapped[JSONValue] = mapped_column(JSON, nullable=True)
+    # JSON fields for params and output (dict, not string)
+    params: Mapped[JSONObject] = mapped_column(
+        MutableDict.as_mutable(JSON),
+        nullable=False,
+        default=dict,
+    )
+
+    output: Mapped[JSONObject | None] = mapped_column(
+        MutableDict.as_mutable(JSON),
+        nullable=True,
+    )
 
     status: Mapped[str] = mapped_column(String, nullable=False, index=True)
     progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -63,60 +72,3 @@ class Job(Base):
     @override
     def __repr__(self) -> str:
         return f"<Job(job_id={self.job_id}, task_type={self.task_type}, status={self.status})>"
-
-    # -------------------------------------------------------------------------
-    # Pydantic Conversion Helpers
-    # -------------------------------------------------------------------------
-
-    def to_job_record(self) -> "JobRecord":
-        """Convert SQLAlchemy Job to Pydantic JobRecord.
-
-        Returns:
-            Pydantic JobRecord with core job fields
-        """
-        from cl_ml_tools.common.schema_job_record import JobRecord, JobStatus
-
-        return JobRecord(
-            job_id=self.job_id,
-            task_type=self.task_type,
-            params=self.params,  # pyright: ignore[reportArgumentType] TODO: Remove this ignore once JobRecord is udated with JSONValue
-            output=self.output,  # pyright: ignore[reportArgumentType] TODO: Remove this ignore once JobRecord is udated with JSONValue
-            status=JobStatus(self.status),
-            progress=self.progress,
-            error_message=self.error_message,
-        )
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        job_record: "JobRecord",
-        *,
-        created_by: str | None = None,
-        priority: int | None = None,
-    ) -> "Job":
-        """Create SQLAlchemy Job from Pydantic JobRecord.
-
-        Args:
-            job_record: Pydantic JobRecord
-            created_by: Optional user identifier
-            priority: Optional priority level
-
-        Returns:
-            SQLAlchemy Job instance (not persisted)
-        """
-        import time
-
-        return cls(
-            job_id=job_record.job_id,
-            task_type=job_record.task_type,
-            params=job_record.params,
-            status=job_record.status.value,
-            progress=job_record.progress,
-            task_output=job_record.output,
-            error_message=job_record.error_message,
-            created_at=int(time.time() * 1000),
-            priority=priority or 0,
-            retry_count=0,
-            max_retries=3,
-            created_by=created_by,
-        )

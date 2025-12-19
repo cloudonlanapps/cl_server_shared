@@ -13,6 +13,7 @@ Usage:
 
 import sys
 import time
+
 import paho.mqtt.client as mqtt
 
 
@@ -107,7 +108,9 @@ def main():
 
     # Confirm for wildcard patterns
     if topic_pattern in ("#", "+/#", "#/+"):
-        response = input("\n⚠️  WARNING: This will clear ALL retained messages!\nContinue? (yes/no): ")
+        response = input(
+            "\n⚠️  WARNING: This will clear ALL retained messages!\nContinue? (yes/no): "
+        )
         if response.lower() != "yes":
             print("Cancelled.")
             sys.exit(0)

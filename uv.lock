@@ -70,7 +70,7 @@ wheels = [
 [[package]]
 name = "cl-ml-tools"
 version = "0.2.1"
-source = { git = "https://github.com/cloudonlanapps/cl_ml_tools.git?rev=ModifyJobParams#eea6519c2039ac09dcb663a5253c21bc895de602" }
+source = { git = "https://github.com/cloudonlanapps/cl_ml_tools.git#8b65ebb15b86cb92a7c0fc933c154dfb77c2617b" }
 dependencies = [
     { name = "aiofiles" },
     { name = "basedpyright" },
@@ -127,7 +127,7 @@ fastapi = [
 requires-dist = [
     { name = "aiofiles", specifier = ">=25.0.0" },
     { name = "basedpyright", marker = "extra == 'dev'", specifier = ">=1.36.0" },
-    { name = "cl-ml-tools", git = "https://github.com/cloudonlanapps/cl_ml_tools.git?rev=ModifyJobParams" },
+    { name = "cl-ml-tools", git = "https://github.com/cloudonlanapps/cl_ml_tools.git" },
     { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.100.0" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.100.0" },
     { name = "pillow", marker = "extra == 'all'", specifier = ">=10.0.0" },
