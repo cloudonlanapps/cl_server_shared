@@ -88,7 +88,7 @@ class Config:
     )
 
     WORKER_DATABASE_URL: str = _get_value(
-        "DATABASE_URL", f"sqlite:///{CL_SERVER_DIR}/media_store.db"
+        "DATABASE_URL", f"sqlite:///{CL_SERVER_DIR}/compute.db"
     )
 
     # ========================================================================
