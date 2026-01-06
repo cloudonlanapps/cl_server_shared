@@ -36,7 +36,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "pydantic>=2.0.0",
     "aiofiles>=25.0.0",
-    "cl_ml_tools",
+    "cl_ml_tools @ git+https://github.com/cloudonlanapps/cl_ml_tools.git@main",
 ]
 
 [project.optional-dependencies]
@@ -47,8 +47,6 @@ dev = [
     "ruff>=0.1.0",
     "basedpyright>=1.36.0",
 ]
-[tool.uv.sources]
-cl-ml-tools = { git = "https://github.com/cloudonlanapps/cl_ml_tools.git", rev = "main"  }
 
 [project.urls]
 Homepage = "https://github.com/cl-server/cl-server-shared"
