@@ -69,10 +69,10 @@ def clear_retained_messages(broker="localhost", port=1883, topic_pattern="#"):
         client.disconnect()
 
         # Summary
-        print(f"\n✓ Cleanup complete!")
+        print("\n✓ Cleanup complete!")
         print(f"  Total retained messages cleared: {len(found_topics)}")
         if found_topics:
-            print(f"  Topics cleared:")
+            print("  Topics cleared:")
             for topic in found_topics:
                 print(f"    - {topic}")
         else:
