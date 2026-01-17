@@ -36,15 +36,18 @@ class Config:
             Validated CL_SERVER_DIR path
 
         Raises:
-            ValueError: If CL_SERVER_DIR not set or not writable
+            ValueError: If CL_SERVER_DIR not set or path not writable
         """
         cl_server_dir = os.getenv("CL_SERVER_DIR")
         if not cl_server_dir:
             raise ValueError("CL_SERVER_DIR environment variable must be set")
 
+        if not os.path.exists(cl_server_dir):
+            os.makedirs(cl_server_dir, exist_ok=True)
+
         if not os.access(cl_server_dir, os.W_OK):
             raise ValueError(
-                f"CL_SERVER_DIR does not exist or no write permission: {cl_server_dir}"
+                f"Storage directory does not exist or no write permission: {cl_server_dir}"
             )
 
         return cl_server_dir
